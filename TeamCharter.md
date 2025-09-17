@@ -69,6 +69,6 @@
 Кожен учасник підтверджує згоду, позначивши свій прапорець літерою **x** у **власному** коміті.
 - [x] Зінченко Вероніка (GitHub: @heloveroo)
 - [x] Федін Володимир (GitHub: @Class1c22)
-- [ ] Ковтонюк Анастасія (GitHub: @anastasiakovtoniuk)
+- [x] Ковтонюк Анастасія (GitHub: @anastasiakovtoniuk)
 - [x] Виговський Владислав (GitHub: @vyhovskyi-v)
 
