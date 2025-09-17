@@ -70,5 +70,5 @@
 - [x] Зінченко Вероніка (GitHub: @heloveroo)
 - [x] Федін Володимир (GitHub: @Class1c22)
 - [ ] Ковтонюк Анастасія (GitHub: @anastasiakovtoniuk)
-- [ ] Виговський Владислав (GitHub: @vyhovskyi-v)
+- [x] Виговський Владислав (GitHub: @vyhovskyi-v)
 
