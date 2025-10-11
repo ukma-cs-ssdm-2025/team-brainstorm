@@ -18,3 +18,8 @@ app.include_router(reservations.router, prefix="/reservations", tags=["reservati
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+from src.api.routes import users, reminders
+
+app.include_router(users.router)
+app.include_router(reminders.router)
