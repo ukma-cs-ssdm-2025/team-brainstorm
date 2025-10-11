@@ -5,6 +5,7 @@ from threading import Lock
 DB_LOCK = Lock()
 BOOKS = {}
 RESERVATIONS = {}
+USERS = {}
 
 
 # додано тестову книгу
@@ -16,4 +17,5 @@ BOOKS[book_id] = {
     "author": "Robert C. Martin",
     "total_copies": 3,
     "reserved_count": 0,
+
 }
