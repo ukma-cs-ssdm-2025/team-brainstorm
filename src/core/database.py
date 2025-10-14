@@ -6,7 +6,7 @@ DB_LOCK = Lock()
 BOOKS = {}
 RESERVATIONS = {}
 USERS = {}
-
+REVIEWS = {}
 
 # додано тестову книгу
 book_id = uuid4()
@@ -19,3 +19,4 @@ BOOKS[book_id] = {
     "reserved_count": 0,
 
 }
+
