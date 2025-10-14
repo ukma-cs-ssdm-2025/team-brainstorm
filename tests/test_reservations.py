@@ -146,3 +146,24 @@ def test_create_reservation_missing_fields():
     """Перевіряє валідацію при відсутніх полях."""
     r = client.post("/reservations/", json={"user_id": str(uuid4())})
     assert r.status_code == 422
+#редагування книги заборонено для не бібліотекаря
+def test_update_book_forbidden_for_non_librarian():
+    book_id = str(uuid4())
+    r = client.patch(
+        f"/books/{book_id}",
+        headers={"X-Role": "user"},  # не librarian
+        json={"title": "Hacker title"},
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Only librarian can edit books"
+
+#редагування неіснуючої книги
+    def test_update_book_not_found():
+    non_existent_id = uuid4()
+    r = client.patch(
+        f"/books/{non_existent_id}",
+        headers={"X-Role": "librarian"},
+        json={"title": "Doesn't matter"},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Book not found"

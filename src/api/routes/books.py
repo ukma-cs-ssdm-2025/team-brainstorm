@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Query
-from typing import List
+from fastapi import APIRouter, Query, HTTPException, Header, status
+from typing import List, Optional
 from uuid import UUID
-from src.core.database import BOOKS
 from pydantic import BaseModel, Field, constr
+from src.core.database import BOOKS, DB_LOCK
+
 
 
 router = APIRouter()
@@ -15,7 +16,17 @@ class BookOut(BaseModel):
     author: str
     total_copies: int
     reserved_count: int = Field(0)
+    genres: List[str] = Field(default_factory=list)
 
+class BookUpdate(BaseModel):
+    isbn: Optional[constr(min_length=10, max_length=17)] = None
+    title: Optional[str] = None
+    author: Optional[str] = None
+    description: Optional[str] = None
+    year: Optional[int] = Field(None, ge=1400, le=2100)
+    total_copies: Optional[int] = Field(None, ge=0)
+    reserved_count: Optional[int] = Field(None, ge=0)
+    genres: Optional[List[str]] = None
 
 @router.get("/", response_model=List[BookOut])
 def list_books(available_only: bool = Query(False)):
@@ -26,3 +37,34 @@ def list_books(available_only: bool = Query(False)):
             continue
         results.append(BookOut(**b))
     return results
+
+@router.patch("/{book_id}", response_model=BookOut)
+def update_book(
+    book_id: UUID,
+    payload: BookUpdate,
+    x_role: str = Header(..., alias="X-Role", description="user | librarian"),
+):
+    if x_role.lower() != "librarian":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only librarian can edit books")
+
+    with DB_LOCK:
+        book = BOOKS.get(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+
+        # оновлюємо дозволені поля
+        data = payload.dict(exclude_unset=True)
+        for k, v in data.items():
+            if v is None:
+                continue
+            # genres – зберігаємо як список рядків
+            if k == "genres":
+                book["genres"] = list(v)
+            else:
+                book[k] = v
+
+        # інваріанти: reserved_count не може перевищувати total_copies
+        if book.get("total_copies", 0) < book.get("reserved_count", 0):
+            book["reserved_count"] = max(0, book["total_copies"])
+
+        return BookOut(**book)
