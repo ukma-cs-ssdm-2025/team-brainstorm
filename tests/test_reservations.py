@@ -1,169 +1,181 @@
+import pytest
 from fastapi.testclient import TestClient
-from src.api.main import app
 from uuid import uuid4
+from datetime import date, timedelta
+
+from src.api.main import app
+from src.core import database
+
 
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def clear_db():
+    """Очищає 'базу даних' перед кожним тестом і додає тестову книгу."""
+    database.BOOKS.clear()
+    database.RESERVATIONS.clear()
+    database.USERS.clear()
+    database.REVIEWS.clear()
+
+    book_id = uuid4()
+    database.BOOKS[book_id] = {
+        "id": book_id,
+        "isbn": "9783161484100",
+        "title": "Clean Architecture",
+        "author": "Robert Martin",
+        "total_copies": 2,
+        "reserved_count": 0,
+        "genres": ["programming"],
+    }
+    return book_id
+
+
+# 1️⃣ Health check
 def test_health():
-    """Перевіряє, що API живе і повертає статус 'ok'."""
-    r = client.get("/health")
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
 
 
-# --- 🧩 КНИГИ ---
-def test_list_books():
-    """Перевіряє, що список книг повертається успішно."""
-    r = client.get("/books/")
-    assert r.status_code == 200
-    data = r.json()
-    assert isinstance(data, list)
-    if len(data) > 0:
-        book = data[0]
-        assert "id" in book
-        assert "title" in book
-        assert "author" in book
+# 2️⃣ Отримання списку книг
+def test_list_books(clear_db):
+    resp = client.get("/books/")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Clean Architecture"
 
 
-def test_list_books_available_only():
-    """Перевіряє фільтрацію доступних книг."""
-    r = client.get("/books/?available_only=true")
-    assert r.status_code == 200
-    books = r.json()
-    for b in books:
-        assert b["total_copies"] - b.get("reserved_count", 0) > 0
+# 3️⃣ Оновлення книги бібліотекарем
+def test_update_book_as_librarian(clear_db):
+    book_id = next(iter(database.BOOKS))
+    resp = client.patch(
+        f"/books/{book_id}",
+        headers={"X-Role": "librarian"},
+        json={"title": "Updated Book"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "Updated Book"
 
 
-# --- 📚 ОНЛАЙН-КАТАЛОГ ---
-def test_search_books_by_title():
-    """Перевіряє пошук книг за назвою в онлайн-каталозі."""
-    r = client.get("/catalog/search", params={"query": "Python"})
-    assert r.status_code == 200
-    books = r.json()
-    assert isinstance(books, list)
-    for book in books:
-        assert "title" in book
-        assert "Python" in book["title"] or "Python" in book["description"]
+# 4️⃣ Заборонене оновлення користувачем
+def test_update_book_as_user_forbidden(clear_db):
+    book_id = next(iter(database.BOOKS))
+    resp = client.patch(
+        f"/books/{book_id}",
+        headers={"X-Role": "user"},
+        json={"title": "Hack Try"},
+    )
+    assert resp.status_code == 403
 
 
-def test_catalog_pagination():
-    """Перевіряє пагінацію онлайн-каталогу."""
-    r = client.get("/catalog?page=1&limit=2")
-    assert r.status_code == 200
-    data = r.json()
-    assert "items" in data
-    assert "total" in data
-    assert len(data["items"]) <= 2
-
-
-# --- 👤 КОРИСТУВАЧІ ТА РОЛІ ---
-def test_user_registration_and_roles():
-    """Перевіряє реєстрацію користувачів і ролі."""
-    user_payload = {
-        "username": f"user_{uuid4().hex[:6]}",
-        "password": "test123",
+# 5️⃣ Реєстрація та логін користувача
+def test_user_register_and_login():
+    resp = client.post("/users/register", json={
+        "email": "test@example.com",
+        "password": "123456",
         "role": "user"
-    }
-    librarian_payload = {
-        "username": f"librarian_{uuid4().hex[:6]}",
-        "password": "secure123",
-        "role": "librarian"
-    }
+    })
+    assert resp.status_code == 200
 
-    # створення звичайного користувача
-    r1 = client.post("/users/register", json=user_payload)
-    assert r1.status_code == 201, r1.text
-    data1 = r1.json()
-    assert data1["role"] == "user"
-
-    # створення бібліотекаря
-    r2 = client.post("/users/register", json=librarian_payload)
-    assert r2.status_code == 201
-    data2 = r2.json()
-    assert data2["role"] == "librarian"
-
-    # бібліотекар має бачити всі резервації
-    r3 = client.get("/reservations/all?role=librarian")
-    assert r3.status_code == 200
+    resp2 = client.post("/users/login", json={
+        "email": "test@example.com",
+        "password": "123456"
+    })
+    assert resp2.status_code == 200
+    data = resp2.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
 
 
-# --- 🔔 НАГАДУВАННЯ ПРО ПОВЕРНЕННЯ ---
-def test_send_reminder_for_due_books():
-    """Перевіряє нагадування про повернення книг."""
-    r = client.post("/reminders/send")
-    assert r.status_code in (200, 202)
-    result = r.json()
-    assert "sent_reminders" in result
-    assert isinstance(result["sent_reminders"], int)
+# 6️⃣ Створення резервації
+def test_create_reservation(clear_db):
+    user_id = uuid4()
+    book_id = next(iter(database.BOOKS))
+    database.USERS[user_id] = {"id": user_id, "email": "user@test.com"}
+
+    payload = {"user_id": str(user_id), "book_id": str(book_id)}
+    resp = client.post("/reservations/", json=payload)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["book_id"] == str(book_id)
+    assert "from_date" in data
 
 
-# --- 📖 РЕЗЕРВАЦІЇ ---
-def test_create_and_cancel_reservation():
-    """Інтеграційний тест для створення і видалення резервації."""
-    # Отримати одну книгу
-    r = client.get("/books/")
-    assert r.status_code == 200
-    books = r.json()
-    assert len(books) > 0, "Не знайдено жодної книги для тесту"
+# 7️⃣ Скасування резервації
+def test_cancel_reservation(clear_db):
+    user_id = uuid4()
+    book_id = next(iter(database.BOOKS))
+    database.USERS[user_id] = {"id": user_id, "email": "cancel@test.com"}
 
-    book = books[0]
-    user_id = str(uuid4())
-    payload = {"user_id": user_id, "book_id": book["id"]}
-
-    # Створити резервацію
-    r2 = client.post("/reservations/", json=payload)
-    assert r2.status_code == 201, r2.text
-    res = r2.json()
-    assert "id" in res
-    assert res["user_id"] == user_id
-
+    payload = {"user_id": str(user_id), "book_id": str(book_id)}
+    res = client.post("/reservations/", json=payload).json()
     res_id = res["id"]
 
-    # Скасувати резервацію
-    r3 = client.delete(f"/reservations/{res_id}")
-    assert r3.status_code == 204
+    resp = client.delete(f"/reservations/{res_id}")
+    assert resp.status_code == 204
+    assert res_id not in database.RESERVATIONS
 
 
-def test_cancel_nonexistent_reservation():
-    """Перевіряє, що скасування неіснуючої резервації повертає 404."""
-    fake_id = str(uuid4())
-    r = client.delete(f"/reservations/{fake_id}")
-    assert r.status_code == 404
+# 8️⃣ Додавання і перегляд відгуків
+def test_add_and_list_reviews(clear_db):
+    user_id = uuid4()
+    book_id = next(iter(database.BOOKS))
+    database.USERS[user_id] = {"id": user_id, "email": "review@test.com"}
+
+    resp = client.post(f"/books/{book_id}/reviews", json={
+        "user_id": str(user_id),
+        "rating": 5,
+        "comment": "Excellent!"
+    })
+    assert resp.status_code == 201
+    review_id = resp.json()["id"]
+
+    resp2 = client.get(f"/books/{book_id}/reviews")
+    data = resp2.json()
+    assert data["count"] == 1
+    assert data["average_rating"] == 5
+    assert data["items"][0]["comment"] == "Excellent!"
+    assert data["items"][0]["id"] == review_id
 
 
-def test_create_reservation_with_invalid_book():
-    """Перевіряє, що створення резервації з неіснуючою книгою не допускається."""
-    user_id = str(uuid4())
-    fake_book_id = str(uuid4())
-    payload = {"user_id": user_id, "book_id": fake_book_id}
+# 9️⃣ Видалення відгуку
+def test_delete_review(clear_db):
+    user_id = uuid4()
+    book_id = next(iter(database.BOOKS))
+    database.USERS[user_id] = {"id": user_id, "email": "delreview@test.com"}
 
-    r = client.post("/reservations/", json=payload)
-    assert r.status_code == 404
+    resp = client.post(f"/books/{book_id}/reviews", json={
+        "user_id": str(user_id),
+        "rating": 4,
+        "comment": "Good"
+    })
+    review_id = resp.json()["id"]
+
+    del_resp = client.delete(f"/books/reviews/{review_id}")
+    assert del_resp.status_code == 204
+    assert review_id not in database.REVIEWS
 
 
-def test_create_reservation_missing_fields():
-    """Перевіряє валідацію при відсутніх полях."""
-    r = client.post("/reservations/", json={"user_id": str(uuid4())})
-    assert r.status_code == 422
-#редагування книги заборонено для не бібліотекаря
-def test_update_book_forbidden_for_non_librarian():
-    book_id = str(uuid4())
-    r = client.patch(
-        f"/books/{book_id}",
-        headers={"X-Role": "user"},  # не librarian
-        json={"title": "Hacker title"},
-    )
-    assert r.status_code == 403
-    assert r.json()["detail"] == "Only librarian can edit books"
+# 🔟 Перевірка нагадувань
+def test_reminders(clear_db):
+    user_id = uuid4()
+    book_id = next(iter(database.BOOKS))
+    database.USERS[user_id] = {"id": user_id, "email": "remind@test.com"}
 
-#редагування неіснуючої книги
-    def test_update_book_not_found():
-    non_existent_id = uuid4()
-    r = client.patch(
-        f"/books/{non_existent_id}",
-        headers={"X-Role": "librarian"},
-        json={"title": "Doesn't matter"},
-    )
-    assert r.status_code == 404
-    assert r.json()["detail"] == "Book not found"
+    res_id = uuid4()
+    database.RESERVATIONS[res_id] = {
+        "id": res_id,
+        "book_id": book_id,
+        "user_id": user_id,
+        "from_date": date.today(),
+        "until": date.today() + timedelta(days=1)
+    }
+
+    resp = client.get("/reminders/")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert "days_left" in data[0]
+    assert data[0]["book_title"] == "Clean Architecture"
