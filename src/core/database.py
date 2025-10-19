@@ -8,6 +8,7 @@ RESERVATIONS = {}
 USERS = {}
 REVIEWS = {}
 
+
 # додано тестову книгу
 book_id = uuid4()
 BOOKS[book_id] = {
@@ -17,6 +18,5 @@ BOOKS[book_id] = {
     "author": "Robert C. Martin",
     "total_copies": 3,
     "reserved_count": 0,
-
+    "genre": []
 }
-
