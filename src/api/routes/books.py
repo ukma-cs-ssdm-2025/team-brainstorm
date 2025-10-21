@@ -80,4 +80,10 @@ def update_book(
         if book.get("total_copies", 0) < book.get("reserved_count", 0):
             book["reserved_count"] = max(0, book["total_copies"])
 
+
         return BookOut(**book)
+@router.get("/available_count")
+def get_available_books_count():
+    with DB_LOCK:
+        available = [book for book in BOOKS.values() if book.get("available", 0) > 0]
+    return {"available_count": len(available)}
