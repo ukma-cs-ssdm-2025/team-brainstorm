@@ -96,3 +96,14 @@ def get_available_books_count() -> dict[str, int]:
         ]
     return {"available_count": len(available_books)}
 
+@router.get("/{book_id}", response_model=BookOut)
+def get_book_by_id(book_id: UUID):
+    """
+    Отримує книгу за ID. Повертає 404, якщо книга не знайдена.
+    """
+    with DB_LOCK:
+        book = BOOKS.get(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        return BookOut(**book)
+
