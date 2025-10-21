@@ -211,4 +211,11 @@ def test_available_books_count():
     assert "available_count" in data
     assert isinstance(data["available_count"], int)
 
+def test_get_book_by_id_not_found(clear_db):
+    from uuid import uuid4
+    missing_id = uuid4()
+    resp = client.get(f"/books/{missing_id}")
+    assert resp.status_code == 404
+
+
 
