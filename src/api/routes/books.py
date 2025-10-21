@@ -82,8 +82,17 @@ def update_book(
 
 
         return BookOut(**book)
+        
 @router.get("/available_count")
-def get_available_books_count():
+def get_available_books_count() -> dict[str, int]:
+    """
+    Повертає кількість доступних (не зарезервованих) книг у бібліотеці.
+    """
     with DB_LOCK:
-        available = [book for book in BOOKS.values() if book.get("available", 0) > 0]
-    return {"available_count": len(available)}
+        available_books = [
+            book
+            for book in BOOKS.values()
+            if book.get("total_copies", 0) - book.get("reserved", 0) > 0
+        ]
+    return {"available_count": len(available_books)}
+
