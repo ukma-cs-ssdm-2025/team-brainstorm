@@ -1,4 +1,9 @@
 import pytest
+import sys
+import os
+
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from fastapi.testclient import TestClient
 from uuid import uuid4
 from datetime import date, timedelta
@@ -179,3 +184,31 @@ def test_reminders(clear_db):
     assert len(data) == 1
     assert "days_left" in data[0]
     assert data[0]["book_title"] == "Clean Architecture"
+
+def test_list_books_filter_by_single_genre_returns_only_matching(clear_db):
+    # act
+    resp = client.get("/books/", params={"genres": "programming"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # assert: лише книги з жанром "programming"
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["title"] == "Clean Architecture"
+    assert "programming" in data[0].get("genres", [])
+
+def test_list_books_filter_by_unknown_genre_returns_empty(clear_db):
+    resp = client.get("/books/", params={"genres": "history"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 0
+
+def test_available_books_count(client, clear_db):
+    resp = client.get("/books/available_count")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert data[0]["title"] == "Clean Architecture"
+    assert data[0]["available_count"] == 2
+
