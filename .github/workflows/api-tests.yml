@@ -1,9 +1,12 @@
-name: CI - FastAPI
+name: CI - Api Tests
 
 on:
   push:
     branches:
-      - ci-test
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
