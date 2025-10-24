@@ -217,5 +217,15 @@ def test_get_book_by_id_not_found(clear_db):
     resp = client.get(f"/books/{missing_id}")
     assert resp.status_code == 404
 
+    # 1️⃣1️⃣ Перевірка паролю
+
+def test_password_too_short_raises():
+        with pytest.raises(ValueError) as e:
+            validate_password("short")
+        assert "at least 8" in str(e.value).lower()
+
+def test_password_valid_length_passes():
+        # рівно 8 символів
+        validate_password("abc12345")
 
 
