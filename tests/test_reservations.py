@@ -1,13 +1,14 @@
 import pytest
 import sys
 import os
-
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from fastapi.testclient import TestClient
 from uuid import uuid4
 from datetime import date, timedelta
 
+# додати src у шлях (щоб pytest бачив модулі)
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from src.core.security import validate_password
 from src.api.main import app
 from src.core import database
 
