@@ -17,3 +17,15 @@ def create_token(data: dict):
     expire = datetime.utcnow() + timedelta(hours=1)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def validate_password(password: str) -> None:
+    """
+    Перевіряє, що пароль не порожній і має щонайменше 8 символів.
+    """
+    if password is None:
+        raise ValueError("Password cannot be None")
+    pwd = password.strip()
+    if not pwd:
+        raise ValueError("Password cannot be empty or whitespace")
+    if len(pwd) < 8:
+        raise ValueError("Password must be at least 8 characters long")
