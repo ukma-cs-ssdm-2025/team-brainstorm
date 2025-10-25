@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Library Frontend</title>
+    <link rel="stylesheet" href="styles.css?v=2" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">📚</div>
+          <h1>Library Frontend</h1>
+        </div>
+        <div class="controls">
+          <div class="control">
+            <label for="apiBase">API Base (Docker, proxied)</label>
+            <input class="input" id="apiBase" value="/api" readonly />
+          </div>
+          <div class="control align-end">
+            <label>&nbsp;</label>
+            <button class="btn btn-outline" id="ping">Перевірити</button>
+            <span class="badge" id="healthStatus">не перевірено</span>
+          </div>
+          <div class="control">
+            <label for="userEmail">User Email (favorites)</label>
+            <input class="input" id="userEmail" placeholder="you@example.com" />
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container grid">
+      <section class="card">
+        <div class="card-header">
+          <h2>Книги</h2>
+          <p class="muted">Фільтруй доступні екземпляри або за жанрами</p>
+        </div>
+        <div class="toolbar">
+          <label class="checkbox">
+            <input type="checkbox" id="availableOnly" /> Лише доступні
+          </label>
+          <div class="grow"></div>
+          <label class="sr-only" for="genres">Жанри</label>
+          <input class="input" id="genres" placeholder="fantasy, sci-fi" />
+          <button class="btn btn-primary" id="loadBooks">Завантажити книги</button>
+        </div>
+        <ul class="list" id="books"></ul>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Резервації</h2>
+          <p class="muted">Резервації, створені під час поточної сесії</p>
+        </div>
+        <ul class="list" id="reservations"></ul>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Вибране</h2>
+          <p class="muted">Керуй списком улюблених книжок</p>
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="loadFavs">Завантажити моє вибране</button>
+          <button class="btn btn-ghost" id="countFavs">Кількість</button>
+          <button class="btn btn-danger" id="clearFavs">Очистити все</button>
+          <span class="badge" id="favCount"></span>
+        </div>
+        <ul class="list" id="favorites"></ul>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js?v=2"></script>
+  </body>
+  </html>
