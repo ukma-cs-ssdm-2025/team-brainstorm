@@ -229,4 +229,26 @@ def test_password_valid_length_passes():
         # рівно 8 символів
         validate_password("abc12345")
 
+def test_get_ebook(client):
 
+    from uuid import uuid4
+    from src.core.database import BOOKS, DB_LOCK
+
+    with DB_LOCK:
+        BOOKS.clear()
+        book_id = uuid4()
+        BOOKS[book_id] = {
+            "id": book_id,
+            "isbn": "978-3-16-148410-0",
+            "title": "Clean Code",
+            "author": "Robert C. Martin",
+            "total_copies": 3,
+            "reserved_count": 0,
+            "genres": ["programming", "software"],
+            "ebook_url": "data/ebooks/clean_code.pdf",
+        }
+
+    resp = client.get(f"/books/{book_id}/ebook")
+
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+    assert resp.headers["content-type"] == "application/pdf"

@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Query, HTTPException, Header, status
+from fastapi import Query, Header, status
 from typing import List, Optional
-from uuid import UUID
 from pydantic import BaseModel, Field, constr
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+from uuid import UUID
+from pathlib import Path
 from src.core.database import BOOKS, DB_LOCK
 
 
@@ -124,3 +127,29 @@ def get_book_by_id(
         return book_data
 
 
+@router.get("/{book_id}/ebook", response_class=FileResponse)
+def get_ebook(book_id: UUID):
+    """
+    Повертає PDF-файл електронної версії книги.
+    """
+    with DB_LOCK:
+        book = BOOKS.get(book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+
+        ebook_path = book.get("ebook_url")
+        if not ebook_path:
+            raise HTTPException(status_code=404, detail="E-book version not available")
+
+        # ✅ Универсально определяем абсолютный путь
+        project_root = Path(__file__).resolve().parents[2]  # путь до src/
+        abs_path = (project_root / ebook_path).resolve()
+
+    if not abs_path.exists():
+        raise HTTPException(status_code=404, detail=f"E-book file not found: {abs_path}")
+
+    return FileResponse(
+        abs_path,
+        media_type="application/pdf",
+        filename=f"{book['title'].replace(' ', '_')}.pdf"
+    )
