@@ -38,6 +38,7 @@ async function ping() {
     setHealth(json.status || "ok");
     showToast("API доступне", "info");
   } catch (e) {
+    console.log ("Exception while doing something: ${err}")
     setHealth("error");
     showToast("API недоступне", "danger");
   }

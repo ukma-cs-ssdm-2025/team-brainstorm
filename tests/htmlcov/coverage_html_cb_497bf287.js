@@ -316,7 +316,7 @@ coverage.LINE_FILTERS_STORAGE = "COVERAGE_LINE_FILTERS";
 
 coverage.pyfile_ready = function () {
     // If we're directed to a particular line number, highlight the line.
-    var frag = location.hash;
+    const frag = location.hash;
     if (frag.length > 2 && frag[1] === "t") {
         document.querySelector(frag).closest(".n").classList.add("highlight");
         coverage.set_sel(parseInt(frag.substr(2), 10));
@@ -454,7 +454,7 @@ coverage.to_next_chunk = function () {
     const c = coverage;
 
     // Find the start of the next colored chunk.
-    var probe = c.sel_end;
+    const probe = c.sel_end;
     var chunk_indicator, probe_line;
     while (true) {
         probe_line = c.line_elt(probe);
