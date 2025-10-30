@@ -36,7 +36,7 @@ function on_click(sel, fn) {
 function getCellValue(row, column = 0) {
     const cell = row.cells[column]  // nosemgrep: eslint.detect-object-injection
     if (cell.childElementCount == 1) {
-        var child = cell.firstElementChild;
+        const child = cell.firstElementChild;
         if (child.tagName === "A") {
             child = child.firstElementChild;
         }
