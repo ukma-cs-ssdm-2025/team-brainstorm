@@ -21,6 +21,7 @@ function setHealth(status) {
     el.textContent = status;
   }
 }
+//
 
 function showToast(message, kind = "info", timeout = 2500) {
   const t = $("#toast");
