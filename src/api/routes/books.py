@@ -1,17 +1,17 @@
-from fastapi import Query, Header, status
+from fastapi import Query, Header, status, APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel, Field, constr
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
 from uuid import UUID
 from pathlib import Path
 from src.core.database import BOOKS, DB_LOCK
 
-
-
 router = APIRouter()
 
 
+# ==========================
+# 📘 Моделі даних
+# ==========================
 class BookOut(BaseModel):
     id: UUID
     isbn: constr(min_length=10, max_length=17)
@@ -20,6 +20,7 @@ class BookOut(BaseModel):
     total_copies: int
     reserved_count: int = Field(0)
     genres: List[str] = Field(default_factory=list)
+
 
 class BookUpdate(BaseModel):
     isbn: Optional[constr(min_length=10, max_length=17)] = None
@@ -31,6 +32,10 @@ class BookUpdate(BaseModel):
     reserved_count: Optional[int] = Field(None, ge=0)
     genres: Optional[List[str]] = None
 
+
+# ==========================
+# 📚 Отримання списку книг
+# ==========================
 @router.get("/", response_model=List[BookOut])
 def list_books(
         available_only: bool = Query(False),
@@ -38,13 +43,12 @@ def list_books(
 ):
     results = []
     for b in BOOKS.values():
-        # Фільтр: лише доступні
+        # 🔎 Фільтр: лише доступні
         if available_only and (b["total_copies"] - b.get("reserved_count", 0)) <= 0:
             continue
 
-        # Фільтр: жанри
+        # 🔎 Фільтр: жанри
         if genres:
-            # нормалізуємо регістр
             book_genres = [g.lower() for g in b.get("genres", [])]
             if not any(g.lower() in book_genres for g in genres):
                 continue
@@ -54,6 +58,9 @@ def list_books(
     return results
 
 
+# ==========================
+# ✏️ Оновлення книги
+# ==========================
 @router.patch("/{book_id}", response_model=BookOut)
 def update_book(
         book_id: UUID,
@@ -68,24 +75,25 @@ def update_book(
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
 
-        # оновлюємо дозволені поля
         data = payload.dict(exclude_unset=True)
         for k, v in data.items():
             if v is None:
                 continue
-            # genres – зберігаємо як список рядків
             if k == "genres":
                 book["genres"] = list(v)
             else:
                 book[k] = v
 
-        # інваріанти: reserved_count не може перевищувати total_copies
+        # ✅ reserved_count не може перевищувати total_copies
         if book.get("total_copies", 0) < book.get("reserved_count", 0):
             book["reserved_count"] = max(0, book["total_copies"])
 
-
         return BookOut(**book)
-        
+
+
+# ==========================
+# 🔢 Кількість доступних книг
+# ==========================
 @router.get("/available_count")
 def get_available_books_count() -> dict[str, int]:
     """
@@ -95,14 +103,19 @@ def get_available_books_count() -> dict[str, int]:
         available_books = [
             book
             for book in BOOKS.values()
-            if book.get("total_copies", 0) - book.get("reserved", 0) > 0
+            if book.get("total_copies", 0) - book.get("reserved_count", 0) > 0
         ]
+
     return {"available_count": len(available_books)}
 
+
+# ==========================
+# 🔍 Отримати книгу за ID
+# ==========================
 @router.get("/{book_id}", response_model=BookOut)
 def get_book_by_id(
-    book_id: UUID,
-    include_availability: bool = Query(False, description="Include availability information")
+        book_id: UUID,
+        include_availability: bool = Query(False, description="Include availability information")
 ):
     """
     Отримує детальну інформацію про книгу за ID.
@@ -111,22 +124,24 @@ def get_book_by_id(
         book = BOOKS.get(book_id)
         if not book:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"Book with ID {book_id} not found"
             )
-        
-        # Створюємо базовий об'єкт книги
+
         book_data = BookOut(**book)
-        
-        # Додаємо інформацію про доступність
+
+        # ✅ Додаємо інформацію про доступність
         if include_availability:
             available_copies = book.get("total_copies", 0) - book.get("reserved_count", 0)
             book_data.available_copies = max(0, available_copies)
             book_data.is_available = available_copies > 0
-        
+
         return book_data
 
 
+# ==========================
+# 📖 Отримання електронної книги (PDF)
+# ==========================
 @router.get("/{book_id}/ebook", response_class=FileResponse)
 def get_ebook(book_id: UUID):
     """
@@ -141,8 +156,8 @@ def get_ebook(book_id: UUID):
         if not ebook_path:
             raise HTTPException(status_code=404, detail="E-book version not available")
 
-        # ✅ Универсально определяем абсолютный путь
-        project_root = Path(__file__).resolve().parents[2]  # путь до src/
+        # ✅ Коректне визначення абсолютного шляху
+        project_root = Path(__file__).resolve().parents[2]
         abs_path = (project_root / ebook_path).resolve()
 
     if not abs_path.exists():
