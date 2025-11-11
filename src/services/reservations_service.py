@@ -1,7 +1,7 @@
 from uuid import uuid4
 from datetime import date
 from fastapi import HTTPException, status
-from src.core.database import BOOKS, RESERVATIONS, DB_LOCK
+from src.core.database import BOOKS, RESERVATIONS, DB_LOCK, USERS
 
 
 def create_reservation_for_user(user_id, book_id, until_date=None):
@@ -10,6 +10,8 @@ def create_reservation_for_user(user_id, book_id, until_date=None):
     Перевіряє, чи існує книга і чи є вільні копії.
     """
     with DB_LOCK:
+        if user_id not in USERS:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         book = BOOKS.get(book_id)
         if not book:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
