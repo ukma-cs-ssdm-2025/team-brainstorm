@@ -21,7 +21,6 @@ function setHealth(status) {
     el.textContent = status;
   }
 }
-//
 
 function showToast(message, kind = "info", timeout = 2500) {
   const t = $("#toast");
@@ -39,7 +38,6 @@ async function ping() {
     setHealth(json.status || "ok");
     showToast("API доступне", "info");
   } catch (e) {
-    console.log ("Exception while doing something: ${err}")
     setHealth("error");
     showToast("API недоступне", "danger");
   }
@@ -94,14 +92,18 @@ async function loadBooks() {
 
       item.querySelector(".reserve").addEventListener("click", async () => {
         const untilStr = item.querySelector(".until").value || null;
-        const user_id = crypto.randomUUID();
-        const payload = { user_id, book_id: b.id, until: untilStr };
+        const email = userEmail();
+        if (!email) {
+          showToast("Вкажіть email (X-User-Email)", "danger");
+          return;
+        }
+        const payload = { book_id: b.id, until: untilStr };
         const button = item.querySelector(".reserve");
         button.setAttribute("aria-busy", "true");
         try {
           const r = await fetch(`${apiBase()}/reservations/`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "X-User-Email": email },
             body: JSON.stringify(payload),
           });
           if (!r.ok) throw new Error(await r.text());
