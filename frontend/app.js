@@ -1,3 +1,4 @@
+// Простий helper
 const $ = (sel) => document.querySelector(sel);
 
 function apiBase() {
@@ -43,6 +44,104 @@ async function ping() {
   }
 }
 
+// ---------- AUTH helpers ----------
+function storeToken(token) {
+  if (token) localStorage.setItem("token", token);
+  else localStorage.removeItem("token");
+}
+
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+function updateAuthUI(email) {
+  const cur = $("#currentUser");
+  const logoutBtn = $("#logoutBtn");
+  if (email) {
+    cur.textContent = email;
+    logoutBtn.style.display = "inline-block";
+    $("#userEmail").value = email;
+  } else {
+    cur.textContent = "Не в користувача";
+    logoutBtn.style.display = "none";
+  }
+}
+
+function getAuthHeaders() {
+  const headers = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const email = userEmail();
+  if (email) headers["X-User-Email"] = email;
+  return headers;
+}
+
+// ---------- Registration & Login ----------
+async function registerUser() {
+  const email = $("#reg-email").value.trim();
+  const password = $("#reg-password").value;
+  const role = $("#reg-role").value;
+  const msg = $("#auth-message");
+  msg.textContent = "";
+
+  if (!email || !password) {
+    msg.textContent = "Вкажіть email та пароль";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${apiBase()}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, role })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({detail:"Помилка"}));
+      throw new Error(err.detail || "Помилка реєстрації");
+    }
+    msg.textContent = "✅ Реєстрація успішна. Увійдіть";
+  } catch (e) {
+    msg.textContent = `❌ ${e.message}`;
+  }
+}
+
+async function loginUser() {
+  const email = $("#login-email").value.trim();
+  const password = $("#login-password").value;
+  const msg = $("#auth-message");
+  msg.textContent = "";
+
+  if (!email || !password) {
+    msg.textContent = "Вкажіть email та пароль";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${apiBase()}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({detail:"Помилка входу"}));
+      throw new Error(err.detail || "Помилка входу");
+    }
+    const data = await res.json();
+    storeToken(data.access_token);
+    updateAuthUI(email);
+    msg.textContent = "✅ Вхід успішний";
+  } catch (e) {
+    msg.textContent = `❌ ${e.message}`;
+  }
+}
+
+function logout() {
+  storeToken(null);
+  updateAuthUI(null);
+  showToast("Ви вийшли", "info");
+}
+
+// ---------- Books / UI ----------
 function li(text) {
   const el = document.createElement("li");
   el.textContent = text;
@@ -62,7 +161,7 @@ async function loadBooks() {
     if (availableOnly) url.searchParams.set("available_only", "true");
     for (const g of genres) url.searchParams.append("genres", g);
 
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(await res.text());
     const books = await res.json();
     const list = $("#books");
@@ -74,10 +173,10 @@ async function loadBooks() {
       item.innerHTML = `
         <div class="book">
           <div class="meta">
-            <div class="title">${b.title}</div>
-            <div class="sub">${b.author} • ISBN: ${b.isbn}</div>
+            <div class="title">${escapeHtml(b.title)}</div>
+            <div class="sub">${escapeHtml(b.author)} • ISBN: ${escapeHtml(b.isbn)}</div>
             <div class="chips">${(b.genres || [])
-              .map((g) => `<span class=\"chip\">${g}</span>`)
+              .map((g) => `<span class="chip">${escapeHtml(g)}</span>`)
               .join("")}</div>
             <div class="sub">Доступно: ${available}</div>
           </div>
@@ -103,7 +202,7 @@ async function loadBooks() {
         try {
           const r = await fetch(`${apiBase()}/reservations/`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "X-User-Email": email },
+            headers: Object.assign({ "Content-Type": "application/json" }, getAuthHeaders()),
             body: JSON.stringify(payload),
           });
           if (!r.ok) throw new Error(await r.text());
@@ -128,10 +227,7 @@ async function loadBooks() {
         try {
           const r = await fetch(`${apiBase()}/favorites/me`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-User-Email": email,
-            },
+            headers: Object.assign({ "Content-Type": "application/json" }, getAuthHeaders()),
             body: JSON.stringify({ book_id: b.id }),
           });
           if (!r.ok) throw new Error(await r.text());
@@ -169,7 +265,7 @@ function addReservationToList(res) {
     const btn = item.querySelector(".cancel");
     btn.setAttribute("aria-busy", "true");
     try {
-      const r = await fetch(`${apiBase()}/reservations/${res.id}`, { method: "DELETE" });
+      const r = await fetch(`${apiBase()}/reservations/${res.id}`, { method: "DELETE", headers: getAuthHeaders() });
       if (!r.ok && r.status !== 204) throw new Error(await r.text());
       item.remove();
       showToast("Резервацію скасовано", "info");
@@ -187,7 +283,7 @@ async function loadFavorites() {
     return;
   }
   const res = await fetch(`${apiBase()}/favorites/me?expand=true`, {
-    headers: { "X-User-Email": email },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     showToast(`Не вдалося отримати вибране: ${await res.text()}`, "danger");
@@ -196,13 +292,14 @@ async function loadFavorites() {
   const data = await res.json();
   const list = $("#favorites");
   list.innerHTML = "";
-  data.items.forEach((b) => {
+  const items = data.items || [];
+  items.forEach((b) => {
     const item = document.createElement("li");
     item.innerHTML = `
       <div class="fav">
         <div>
-          <div class="title">${b.title}</div>
-          <div class="sub">${b.author}</div>
+          <div class="title">${escapeHtml(b.title)}</div>
+          <div class="sub">${escapeHtml(b.author)}</div>
         </div>
         <div>
           <code>${b.id}</code>
@@ -213,7 +310,7 @@ async function loadFavorites() {
     item.querySelector(".rm").addEventListener("click", async () => {
       const r = await fetch(`${apiBase()}/favorites/me/${b.id}`, {
         method: "DELETE",
-        headers: { "X-User-Email": email },
+        headers: getAuthHeaders(),
       });
       if (!r.ok && r.status !== 204) {
         showToast(`Помилка видалення: ${await r.text()}`, "danger");
@@ -231,7 +328,7 @@ async function countFavorites() {
     return;
   }
   const r = await fetch(`${apiBase()}/favorites/me/count`, {
-    headers: { "X-User-Email": email },
+    headers: getAuthHeaders(),
   });
   if (!r.ok) {
     $("#favCount").textContent = "(помилка)";
@@ -251,17 +348,46 @@ async function clearFavorites() {
   }
   await fetch(`${apiBase()}/favorites/me`, {
     method: "DELETE",
-    headers: { "X-User-Email": email },
+    headers: getAuthHeaders(),
   });
   await loadFavorites();
   await countFavorites();
   showToast("Очищено", "info");
 }
 
+// escape basic html to avoid injection when inserting text
+function escapeHtml(s) {
+  if (!s && s !== 0) return "";
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+// ---------- Init / events ----------
 document.addEventListener("DOMContentLoaded", () => {
+  // wire up buttons
   $("#ping").addEventListener("click", ping);
   $("#loadBooks").addEventListener("click", loadBooks);
   $("#loadFavs").addEventListener("click", loadFavorites);
   $("#countFavs").addEventListener("click", countFavorites);
   $("#clearFavs").addEventListener("click", clearFavorites);
+
+  // auth
+  $("#register-btn").addEventListener("click", registerUser);
+  $("#login-btn").addEventListener("click", loginUser);
+  $("#logoutBtn").addEventListener("click", logout);
+
+  // restore token/email from localStorage (if present)
+  const token = getToken();
+  if (token) {
+    // If token exists, we still prefer the explicit email field if set.
+    const email = userEmail();
+    if (email) updateAuthUI(email);
+    else updateAuthUI(null);
+  } else {
+    updateAuthUI(null);
+  }
 });

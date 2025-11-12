@@ -1,78 +1,119 @@
 <!doctype html>
 <html lang="uk">
-  <head>
+<head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Library Frontend</title>
-    <link rel="stylesheet" href="styles.css?v=2" />
-  </head>
-  <body>
-    <header class="topbar">
-      <div class="container">
+    <link rel="stylesheet" href="styles.css?v=3" />
+</head>
+<body>
+<header class="topbar">
+    <div class="container">
         <div class="brand">
-          <div class="logo" aria-hidden="true">📚</div>
-          <h1>Library Frontend</h1>
+            <div class="logo" aria-hidden="true">📚</div>
+            <h1>Library Frontend</h1>
         </div>
         <div class="controls">
-          <div class="control">
-            <label for="apiBase">API Base (Docker, proxied)</label>
-            <input class="input" id="apiBase" value="/api" readonly />
-          </div>
-          <div class="control align-end">
-            <label>&nbsp;</label>
-            <button class="btn btn-outline" id="ping">Перевірити</button>
-            <span class="badge" id="healthStatus">не перевірено</span>
-          </div>
-          <div class="control">
-            <label for="userEmail">User Email (favorites)</label>
-            <input class="input" id="userEmail" placeholder="you@example.com" />
-          </div>
-        </div>
-      </div>
-    </header>
+            <div class="control">
+                <label for="apiBase">API Base (Docker, proxied)</label>
+                <input class="input" id="apiBase" value="/api" />
+            </div>
 
-    <main class="container grid">
-      <section class="card">
+            <div class="control">
+                <label for="userEmail">User Email (favorites / headers)</label>
+                <input class="input" id="userEmail" placeholder="you@example.com" />
+            </div>
+
+            <div class="control align-end auth-inline">
+                <div id="authInfo" class="auth-info">
+                    <span id="currentUser">Не в користувача</span>
+                    <button class="btn btn-outline" id="logoutBtn" style="display:none">Вийти</button>
+                </div>
+                <div style="margin-left:8px">
+                    <button class="btn btn-outline" id="ping">Перевірити</button>
+                    <span class="badge" id="healthStatus">не перевірено</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="container">
+    <!-- AUTH -->
+    <section id="auth-section" class="card">
         <div class="card-header">
-          <h2>Книги</h2>
-          <p class="muted">Фільтруй доступні екземпляри або за жанрами</p>
+            <h2>Авторизація</h2>
+            <p class="muted">Реєстрація / Вхід для звичайного користувача і бібліотекаря</p>
         </div>
-        <div class="toolbar">
-          <label class="checkbox">
-            <input type="checkbox" id="availableOnly" /> Лише доступні
-          </label>
-          <div class="grow"></div>
-          <label class="sr-only" for="genres">Жанри</label>
-          <input class="input" id="genres" placeholder="fantasy, sci-fi" />
-          <button class="btn btn-primary" id="loadBooks">Завантажити книги</button>
-        </div>
-        <ul class="list" id="books"></ul>
-      </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>Резервації</h2>
-          <p class="muted">Резервації, створені під час поточної сесії</p>
-        </div>
-        <ul class="list" id="reservations"></ul>
-      </section>
+        <div class="auth-grid">
+            <div class="auth-block">
+                <h3>Реєстрація</h3>
+                <input type="email" id="reg-email" class="input" placeholder="Email" />
+                <input type="password" id="reg-password" class="input" placeholder="Пароль (мін. 8)" />
+                <select id="reg-role" class="input">
+                    <option value="user">Звичайний користувач</option>
+                    <option value="librarian">Бібліотекар</option>
+                </select>
+                <button class="btn btn-primary" id="register-btn">Зареєструватися</button>
+            </div>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>Вибране</h2>
-          <p class="muted">Керуй списком улюблених книжок</p>
+            <div class="auth-block">
+                <h3>Увійти</h3>
+                <input type="email" id="login-email" class="input" placeholder="Email" />
+                <input type="password" id="login-password" class="input" placeholder="Пароль" />
+                <button class="btn btn-primary" id="login-btn">Увійти</button>
+                <p class="muted" style="margin-top:8px">Після входу email підставляється у поле <em>User Email</em>.</p>
+            </div>
         </div>
-        <div class="toolbar">
-          <button class="btn" id="loadFavs">Завантажити моє вибране</button>
-          <button class="btn btn-ghost" id="countFavs">Кількість</button>
-          <button class="btn btn-danger" id="clearFavs">Очистити все</button>
-          <span class="badge" id="favCount"></span>
-        </div>
-        <ul class="list" id="favorites"></ul>
-      </section>
-    </main>
 
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=2"></script>
-  </body>
-  </html>
+        <p id="auth-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <!-- MAIN GRID -->
+    <section class="grid">
+        <section class="card">
+            <div class="card-header">
+                <h2>Книги</h2>
+                <p class="muted">Фільтруй доступні екземпляри або за жанрами</p>
+            </div>
+            <div class="toolbar">
+                <label class="checkbox">
+                    <input type="checkbox" id="availableOnly" /> Лише доступні
+                </label>
+                <div class="grow"></div>
+                <label class="sr-only" for="genres">Жанри</label>
+                <input class="input" id="genres" placeholder="fantasy, sci-fi" />
+                <button class="btn btn-primary" id="loadBooks">Завантажити книги</button>
+            </div>
+            <ul class="list" id="books"></ul>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h2>Резервації</h2>
+                <p class="muted">Резервації, створені під час поточної сесії</p>
+            </div>
+            <ul class="list" id="reservations"></ul>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h2>Вибране</h2>
+                <p class="muted">Керуй списком улюблених книжок</p>
+            </div>
+            <div class="toolbar">
+                <button class="btn" id="loadFavs">Завантажити моє вибране</button>
+                <button class="btn btn-ghost" id="countFavs">Кількість</button>
+                <button class="btn btn-danger" id="clearFavs">Очистити все</button>
+                <span class="badge" id="favCount"></span>
+            </div>
+            <ul class="list" id="favorites"></ul>
+        </section>
+    </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js?v=3"></script>
+</body>
+</html>
