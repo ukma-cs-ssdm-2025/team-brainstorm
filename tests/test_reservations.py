@@ -80,14 +80,14 @@ def test_update_book_as_user_forbidden(clear_db):
 def test_user_register_and_login():
     resp = client.post("/users/register", json={
         "email": "test@example.com",
-        "password": "123456",
+        "password": "123456789",
         "role": "user"
     })
     assert resp.status_code == 200
 
     resp2 = client.post("/users/login", json={
         "email": "test@example.com",
-        "password": "123456"
+        "password": "123456789"
     })
     assert resp2.status_code == 200
     data = resp2.json()
@@ -259,7 +259,7 @@ from fastapi.testclient import TestClient
 from uuid import uuid4
 from datetime import date, timedelta
 
-# додати src у шлях (щоб pytest бачив модулі)
+# додати src у шлях (щоб pytest бачив модулі
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from src.core.security import validate_password
@@ -331,22 +331,29 @@ def test_update_book_as_user_forbidden(clear_db):
 
 
 # 5️⃣ Реєстрація та логін користувача
-def test_user_register_and_login():
-    resp = client.post("/users/register", json={
+def test_user_register_and_login(client):
+    """Перевіряє повний цикл: реєстрація → вхід користувача."""
+    # 🧾 Реєстрація нового користувача
+    register_data = {
         "email": "test@example.com",
-        "password": "123456",
+        "password": "123456789",  # відповідає вимогам validate_password()
         "role": "user"
-    })
-    assert resp.status_code == 200
+    }
+    resp = client.post("/users/register", json=register_data)
+    assert resp.status_code == 200, f"Помилка реєстрації: {resp.text}"
 
-    resp2 = client.post("/users/login", json={
-        "email": "test@example.com",
-        "password": "123456"
-    })
-    assert resp2.status_code == 200
+    # 🔐 Авторизація користувача
+    login_data = {
+        "email": register_data["email"],
+        "password": register_data["password"]
+    }
+    resp2 = client.post("/users/login", json=login_data)
+    assert resp2.status_code == 200, f"Помилка входу: {resp2.text}"
+
+    # 🧩 Перевірка відповіді сервера
     data = resp2.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
+    assert "access_token" in data, "Відповідь не містить access_token"
+    assert data.get("token_type") == "bearer", "token_type має бути 'bearer'"
 
 
 # 6️⃣ Створення резервації
@@ -474,10 +481,16 @@ def test_get_book_by_id_not_found(clear_db):
 
     # 1️⃣1️⃣ Перевірка паролю
 
+
 def test_password_too_short_raises():
-        with pytest.raises(ValueError) as e:
-            validate_password("short")
-        assert "at least 8" in str(e.value).lower()
+    """Перевіряє, що короткий пароль викликає ValueError з коректним повідомленням."""
+    with pytest.raises(ValueError) as e:
+        validate_password("short")
+
+    error_message = str(e.value).lower()
+    # Перевіряємо, що повідомлення містить інформацію про мінімальну довжину
+    assert "8" in error_message
+    assert "щонайменше" in error_message or "мінімум" in error_message
 
 def test_password_valid_length_passes():
         # рівно 8 символів
