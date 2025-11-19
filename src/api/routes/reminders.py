@@ -7,7 +7,7 @@ from src.core.database import get_async_session
 from src.api.models.reservation import Reservation
 from src.api.models.bookdb import Book
 
-router = APIRouter(prefix="/reminders", tags=["Reminders"])
+router = APIRouter()
 
 
 @router.get("/")

@@ -12,7 +12,7 @@ from src.api.models.review import Review
 from src.api.models.user import User
 
 
-router = APIRouter(prefix="/books", tags=["reviews"])
+router = APIRouter()
 
 
 # ---------- SCHEMAS ----------
