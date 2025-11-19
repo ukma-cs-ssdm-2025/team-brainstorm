@@ -1,25 +1,22 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from enum import Enum
 
 
 class UserRole(str, Enum):
-    USER = "user"
-    LIBRARIAN = "librarian"
+    user = "user"
+    librarian = "librarian"
 
 
-class UserBase(BaseModel):
+class UserCreate(BaseModel):
     email: EmailStr
-    full_name: str = Field(..., example="John Doe")
+    password: str
+    role: UserRole = UserRole.user
 
 
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=6)
-    role: UserRole = UserRole.USER
-
-
-class UserOut(UserBase):
+class UserOut(BaseModel):
     id: UUID
+    email: EmailStr
     role: UserRole
 
 

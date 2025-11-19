@@ -1,35 +1,66 @@
-from uuid import uuid4
 from datetime import date
+from uuid import uuid4
+
 from fastapi import HTTPException, status
-from src.core.database import BOOKS, RESERVATIONS, DB_LOCK, USERS
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api.models.user import User
+from src.api.models.bookdb import Book
+from src.api.models.reservation import Reservation
 
 
-def create_reservation_for_user(user_id, book_id, until_date=None):
-    """
-    Створює нову резервацію для користувача.
-    Перевіряє, чи існує книга і чи є вільні копії.
-    """
-    with DB_LOCK:
-        if user_id not in USERS:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        book = BOOKS.get(book_id)
-        if not book:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+async def create_reservation_for_user(
+        session: AsyncSession,
+        user_id: int,
+        book_id: int,
+        until_date=None
+):
+    # 1. Перевіряємо, чи існує користувач
+    user_stmt = select(User).where(User.id == user_id)
+    user_res = await session.execute(user_stmt)
+    user = user_res.scalar_one_or_none()
 
-        available = book["total_copies"] - book.get("reserved_count", 0)
-        if available <= 0:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No copies available")
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
 
-        res_id = uuid4()
-        reservation = {
-            "id": res_id,
-            "user_id": user_id,
-            "book_id": book_id,
-            "from_date": date.today(),
-            "until": until_date,
-        }
+    # 2. Перевіряємо, чи існує книга
+    book_stmt = select(Book).where(Book.id == book_id)
+    book_res = await session.execute(book_stmt)
+    book = book_res.scalar_one_or_none()
 
-        RESERVATIONS[res_id] = reservation
-        book["reserved_count"] = book.get("reserved_count", 0) + 1
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found"
+        )
 
-        return reservation
+    # 3. Перевіряємо доступні копії
+    available = book.total_copies - book.reserved_count
+    if available <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No copies available"
+        )
+
+    # 4. Створюємо нову резервацію
+    reservation = Reservation(
+        id=uuid4(),
+        user_id=user_id,
+        book_id=book_id,
+        from_date=date.today(),
+        until=until_date
+    )
+
+    session.add(reservation)
+
+    # 5. Оновлюємо reserved_count
+    book.reserved_count += 1
+
+    await session.commit()
+    await session.refresh(reservation)
+
+    return reservation
