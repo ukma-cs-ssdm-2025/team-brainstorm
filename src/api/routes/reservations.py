@@ -11,7 +11,7 @@ from src.api.models.bookdb import Book
 from src.api.models.reservation import Reservation
 
 
-router = APIRouter(prefix="/reservations", tags=["Reservations"])
+router = APIRouter()
 
 
 class ReservationCreate(BaseModel):
