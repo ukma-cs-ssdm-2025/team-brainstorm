@@ -1,40 +1,75 @@
 from uuid import uuid4
 from fastapi import HTTPException, status
 from passlib.context import CryptContext
-from src.core.database import USERS, DB_LOCK
-from src.api.schemas.user import UserCreate, UserRole
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.api.models.user import User, UserRole
+from src.api.schemas.user import UserCreate
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def create_user(user_data: UserCreate):
-    """Реєструє нового користувача."""
-    with DB_LOCK:
-        if any(u["email"] == user_data.email for u in USERS.values()):
-            raise HTTPException(status_code=400, detail="User already exists")
+async def create_user(session: AsyncSession, user_data: UserCreate) -> User:
+    """Реєстрація нового користувача в PostgreSQL."""
 
-        user_id = uuid4()
-        user = {
-            "id": user_id,
-            "email": user_data.email,
-            "full_name": user_data.full_name,
-            "hashed_password": pwd_context.hash(user_data.password),
-            "role": user_data.role,
-        }
-        USERS[user_id] = user
-        return user
+    # Перевіряємо чи існує email
+    existing = await session.execute(
+        select(User).where(User.email == user_data.email)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already exists"
+        )
+
+    user = User(
+        id=uuid4(),
+        email=user_data.email,
+        full_name=user_data.full_name,
+        password_hash=pwd_context.hash(user_data.password),
+        role=UserRole(user_data.role.value)
+    )
+
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    return user
 
 
-def authenticate_user(email: str, password: str):
-    """Перевіряє email і пароль користувача."""
-    for u in USERS.values():
-        if u["email"] == email and pwd_context.verify(password, u["hashed_password"]):
-            return u
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+async def authenticate_user(
+        session: AsyncSession,
+        email: str,
+        password: str
+) -> User:
+    """Перевіряє email та пароль користувача."""
+
+    result = await session.execute(
+        select(User).where(User.email == email)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user or not pwd_context.verify(password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+
+    return user
 
 
-def get_user_by_id(user_id):
-    user = USERS.get(user_id)
+async def get_user_by_id(session: AsyncSession, user_id) -> User:
+    """Повертає користувача по id."""
+
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
     return user

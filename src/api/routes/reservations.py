@@ -2,11 +2,16 @@ from fastapi import APIRouter, HTTPException, status, Response, Depends, Header
 from pydantic import BaseModel
 from uuid import UUID, uuid4
 from datetime import date
-from src.core.database import BOOKS, RESERVATIONS, DB_LOCK, USERS
-from src.services.reservations_service import create_reservation_for_user
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.database import get_async_session
+from src.api.models.user import User
+from src.api.models.bookdb import Book
+from src.api.models.reservation import Reservation
 
 
-router = APIRouter()
+router = APIRouter(prefix="/reservations", tags=["Reservations"])
 
 
 class ReservationCreate(BaseModel):
@@ -23,48 +28,93 @@ class ReservationOut(BaseModel):
     until: date | None = None
 
 
-def get_current_user_email(x_user_email: str | None = Header(None, alias="X-User-Email")) -> str | None:
-    if x_user_email is None:
-        return None
-    email = x_user_email.strip().lower()
-    return email or None
+# --------------------------
+#  Helper: get user email
+# --------------------------
 
+async def get_user_email(
+        x_user_email: str | None = Header(None, alias="X-User-Email")
+) -> str | None:
+    return x_user_email.strip().lower() if x_user_email else None
+
+
+# --------------------------
+#  Create reservation
+# --------------------------
 
 @router.post("/", response_model=ReservationOut, status_code=status.HTTP_201_CREATED)
-def create_reservation(payload: ReservationCreate, user_email: str | None = Depends(get_current_user_email)):
-    user_id: UUID | None = payload.user_id
+async def create_reservation(
+        payload: ReservationCreate,
+        user_email: str | None = Depends(get_user_email),
+        session: AsyncSession = Depends(get_async_session)
+):
+    # USER ID autoselect via email
+    user_id = payload.user_id
 
     if user_id is None:
         if not user_email:
-            raise HTTPException(status_code=400, detail="Provide user_id or X-User-Email header")
-        # зарезоливити юзера по емейлу та створення мінімального запису
-        with DB_LOCK:
-            for uid, u in USERS.items():
-                if str(u.get("email", "")).strip().lower() == user_email:
-                    user_id = uid
-                    break
-            if user_id is None:
-                uid = uuid4()
-                USERS[uid] = {"id": uid, "email": user_email}
-                user_id = uid
+            raise HTTPException(400, "Provide user_id or X-User-Email header")
+
+        # find user by email
+        result = await session.execute(select(User).where(User.email == user_email))
+        user = result.scalar_one_or_none()
+
+        # create user if not exists
+        if not user:
+            user = User(id=uuid4(), email=user_email)
+            session.add(user)
+            await session.commit()
+
+        user_id = user.id
     else:
-        # впевнитись шо є такий юзер
-        with DB_LOCK:
-            if user_id not in USERS:
-                raise HTTPException(status_code=404, detail="User not found")
+        # check user exists
+        result = await session.execute(select(User).where(User.id == user_id))
+        if result.scalar_one_or_none() is None:
+            raise HTTPException(404, "User not found")
 
-    res = create_reservation_for_user(user_id, payload.book_id, payload.until)
-    return ReservationOut(**res)
+    # check book exists
+    result = await session.execute(select(Book).where(Book.id == payload.book_id))
+    book = result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(404, "Book not found")
 
+    # create reservation
+    reservation = Reservation(
+        id=uuid4(),
+        user_id=user_id,
+        book_id=payload.book_id,
+        from_date=date.today(),
+        until=payload.until,
+    )
+
+    session.add(reservation)
+    await session.commit()
+
+    return ReservationOut(
+        id=reservation.id,
+        user_id=reservation.user_id,
+        book_id=reservation.book_id,
+        from_date=reservation.from_date,
+        until=reservation.until,
+    )
+
+
+# --------------------------
+#  Cancel reservation
+# --------------------------
 
 @router.delete("/{reservation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def cancel_reservation(reservation_id: UUID):
-    with DB_LOCK:
-        res = RESERVATIONS.get(reservation_id)
-        if not res:
-            raise HTTPException(status_code=404, detail="Reservation not found")
-        book = BOOKS.get(res["book_id"])
-        if book:
-            book["reserved_count"] = max(0, book.get("reserved_count", 1) - 1)
-        del RESERVATIONS[reservation_id]
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_reservation(
+        reservation_id: UUID,
+        session: AsyncSession = Depends(get_async_session)
+):
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
+    reservation = result.scalar_one_or_none()
+
+    if not reservation:
+        raise HTTPException(404, "Reservation not found")
+
+    await session.delete(reservation)
+    await session.commit()
+
+    return Response(status_code=204)

@@ -1,21 +1,33 @@
-from uuid import uuid4
-from threading import Lock
+import os
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-DB_LOCK = Lock()
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@db:5432/library"
+)
 
-BOOKS = {}
-RESERVATIONS = {}
-USERS = {}
-REVIEWS = {}
 
-book_id = uuid4()
-BOOKS[book_id] = {
-    "id": book_id,
-    "isbn": "978-3-16-148410-0",
-    "title": "Clean Code",
-    "author": "Robert C. Martin",
-    "total_copies": 3,
-    "reserved_count": 0,
-    "genres": ["programming", "software"],
-    "ebook_url": "data/ebooks/clean_code.pdf",
-}
+engine = create_async_engine(
+    DATABASE_URL,
+    future=True,
+    echo=False
+)
+
+
+async_session_maker = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False
+)
+
+
+SessionLocal = async_session_maker
+
+Base = declarative_base()
+
+
+async def get_async_session():
+    async with async_session_maker() as session:
+        yield session
