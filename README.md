@@ -57,8 +57,8 @@
 - ## ⚙️ Як запустити
 ```bash
 # Клонувати репозиторій
-git clone https://github.com/<your-org>/team-brainstorm-main.git
-cd team-brainstorm-main
+git clone https://github.com/ukma-cs-ssdm-2025/team-brainstorm.git
+cd team-brainstorm
 
 # Створити віртуальне середовище
 python -m venv venv
