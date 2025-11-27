@@ -1,11 +1,17 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+
 from uuid import uuid4
 
 from src.core.security import hash_password, verify_password, create_token
+
+
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from src.core.database import get_async_session
+from src.core.security import decode_token
 from src.api.models.user import User
 
 router = APIRouter()
@@ -66,3 +72,29 @@ async def login(data: UserLogin, session: AsyncSession = Depends(get_async_sessi
         "user_id": str(user.id),
         "role": user.role
     }
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+async def get_current_user_email(
+        token: str = Depends(oauth2_scheme),
+        session: AsyncSession = Depends(get_async_session)
+):
+    """Повертає email користувача, якщо токен валідний."""
+
+    try:
+        payload = decode_token(token)
+        user_id: str = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        query = select(User).where(User.id == user_id)
+        result = await session.execute(query)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        return user.email
+
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")

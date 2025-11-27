@@ -22,6 +22,13 @@ async def seed():
             genres=["programming"],
             total_copies=3
         )
+        book3 = Book(
+            title="дота 2 для чайників",
+            author="шадоурейз",
+            isbn="978-0132353254532",
+            genres=["si-fi"],
+            total_copies=100000
+        )
 
         # додати користувача
         admin = User(
@@ -30,7 +37,7 @@ async def seed():
             role=UserRole.librarian,
         )
 
-        session.add_all([book1, book2, admin])
+        session.add_all([book1, book2, book3, admin])
         await session.commit()
 
 if __name__ == "__main__":
