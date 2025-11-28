@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
+from pydantic import validator
 
 
 class BookBase(BaseModel):
@@ -23,9 +24,16 @@ class BookUpdate(BaseModel):
     genres: Optional[List[str]] = None
 
 
-class BookResponse(BookBase):
+class BookResponse(BaseModel):
     id: UUID
-    reserved_count: int = 0
+    title: str
+    author: str
+    isbn: str
+    genres: List[str]
+    total_copies: int
+    reserved_count: int
+    cover_image: str | None = None
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }

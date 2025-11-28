@@ -1,8 +1,7 @@
 from datetime import date
-from uuid import uuid4
-
+from uuid import UUID, uuid4
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.models.user import User
@@ -12,11 +11,11 @@ from src.api.models.reservation import Reservation
 
 async def create_reservation_for_user(
         session: AsyncSession,
-        user_id: int,
-        book_id: int,
+        user_id: UUID,        # ✅ UUID
+        book_id: UUID,        # ✅ UUID
         until_date=None
 ):
-    # 1. Перевіряємо, чи існує користувач
+    # 1. Перевіряємо користувача
     user_stmt = select(User).where(User.id == user_id)
     user_res = await session.execute(user_stmt)
     user = user_res.scalar_one_or_none()
@@ -27,7 +26,7 @@ async def create_reservation_for_user(
             detail="User not found"
         )
 
-    # 2. Перевіряємо, чи існує книга
+    # 2. Перевіряємо книгу
     book_stmt = select(Book).where(Book.id == book_id)
     book_res = await session.execute(book_stmt)
     book = book_res.scalar_one_or_none()
@@ -38,7 +37,7 @@ async def create_reservation_for_user(
             detail="Book not found"
         )
 
-    # 3. Перевіряємо доступні копії
+    # 3. Перевіряємо доступність
     available = book.total_copies - book.reserved_count
     if available <= 0:
         raise HTTPException(
@@ -46,7 +45,7 @@ async def create_reservation_for_user(
             detail="No copies available"
         )
 
-    # 4. Створюємо нову резервацію
+    # 4. Створюємо резервацію
     reservation = Reservation(
         id=uuid4(),
         user_id=user_id,
@@ -57,7 +56,7 @@ async def create_reservation_for_user(
 
     session.add(reservation)
 
-    # 5. Оновлюємо reserved_count
+    # 5. Оновлюємо лічильник
     book.reserved_count += 1
 
     await session.commit()

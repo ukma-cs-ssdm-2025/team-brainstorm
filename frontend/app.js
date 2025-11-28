@@ -188,61 +188,84 @@ function li(text) {
 async function loadBooks() {
   const btn = $("#loadBooks");
   btn.setAttribute("aria-busy", "true");
+
   try {
+    // --- Фільтри ---
     const availableOnly = $("#availableOnly").checked;
     const genres = $("#genres").value
       .split(",")
       .map((g) => g.trim())
       .filter(Boolean);
-    const url = new URL(`${apiBase().replace(/\/$/, '')}/books/`, window.location.origin);
-    if (availableOnly) url.searchParams.set("available_only", "true");
-    for (const g of genres) url.searchParams.append("genres", g);
 
+    const url = new URL(`${apiBase().replace(/\/$/, "")}/books/`, window.location.origin);
+    if (availableOnly) url.searchParams.set("available_only", "true");
+    genres.forEach((g) => url.searchParams.append("genres", g));
+
+    // --- Запит ---
     const res = await fetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(await res.text());
-    const books = await res.json();
 
+    const books = await res.json();
     const list = $("#books");
     list.innerHTML = "";
+
+    // --- Генерація списку ---
     books.forEach((b) => {
-      const item = document.createElement("li");
-      item.innerHTML = `
+      const li = document.createElement("li");
+      const available = b.total_copies - b.reserved_count;
+
+      li.innerHTML = `
         <div class="book">
           <div>
             <div class="title">${escapeHtml(b.title)}</div>
             <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
             <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "—")}</div>
             <div class="muted small">ID: ${escapeHtml(b.id)}</div>
-            <div class="muted small">Статус: ${
-              b.is_available ? "✅ Доступна" : "⛔ Зарезервована"
-            }</div>
+            <div class="muted small">  Статус: ${available > 0 ? "✅ Доступна" : "⛔ Зарезервована"}</div>
           </div>
 
           <div class="actions">
-            <button class="btn btn-outline reserve-btn" data-id="${escapeHtml(b.id)}" ${
-              b.is_available ? "" : "disabled"
-            }>Резервувати</button>
-            <button class="btn btn-outline fav-btn" data-id="${escapeHtml(b.id)}">У вибране</button>
+            <button
+              class="btn btn-outline reserve-btn"
+              data-id="${escapeHtml(b.id)}"
+              ${available > 0 ? "" : "disabled"}>
+              Резервувати
+            </button>
+
+            <button
+              class="btn btn-outline fav-btn"
+              data-id="${escapeHtml(b.id)}">
+              У вибране
+            </button>
           </div>
         </div>
       `;
 
-      item.querySelector(".reserve-btn")?.addEventListener("click", async (e) => {
+      // --- Резервування ---
+      li.querySelector(".reserve-btn")?.addEventListener("click", async (e) => {
         const id = e.currentTarget.dataset.id;
-        const ok = confirm(`Зарезервувати книгу ID ${id}?`);
-        if (!ok) return;
+
+        if (!confirm(`Зарезервувати книгу ID ${id}?`)) return;
+
         const button = e.currentTarget;
         button.setAttribute("aria-busy", "true");
+
         try {
           const r = await fetch(`${apiBase()}/reservations/`, {
             method: "POST",
-            headers: Object.assign({ "Content-Type": "application/json" }, getAuthHeaders()),
+            headers: {
+              "Content-Type": "application/json",
+              ...getAuthHeaders(),
+            },
             body: JSON.stringify({ book_id: id }),
           });
+
           if (!r.ok) throw new Error(await r.text());
+
+          showToast("Резервація створена", "success");
           await loadBooks();
           await loadReservations();
-          showToast("Резервація створена", "success");
+
         } catch (err) {
           showToast(`Помилка резервації: ${err}`, "danger");
         } finally {
@@ -250,27 +273,36 @@ async function loadBooks() {
         }
       });
 
-      item.querySelector(".fav-btn")?.addEventListener("click", async (e) => {
+      // --- Додавання у вибране ---
+      li.querySelector(".fav-btn")?.addEventListener("click", async (e) => {
         const id = e.currentTarget.dataset.id;
         const button = e.currentTarget;
+
         button.setAttribute("aria-busy", "true");
+
         try {
           const r = await fetch(`${apiBase()}/favorites/me`, {
             method: "POST",
-            headers: Object.assign({ "Content-Type": "application/json" }, getAuthHeaders()),
-            body: JSON.stringify({ book_id: b.id }),
+            headers: {
+              "Content-Type": "application/json",
+              ...getAuthHeaders(),
+            },
+            body: JSON.stringify({ book_id: id }),
           });
+
           if (!r.ok) throw new Error(await r.text());
-          await loadFavorites();
+
           showToast("Додано у вибране", "info");
-        } catch (e2) {
-          showToast(`Помилка додавання у вибране: ${e2}`, "danger");
+          await loadFavorites();
+
+        } catch (err) {
+          showToast(`Помилка: ${err}`, "danger");
         } finally {
           button.removeAttribute("aria-busy");
         }
       });
 
-      list.appendChild(item);
+      list.appendChild(li);
     });
   } catch (e) {
     showToast("Не вдалося завантажити книги", "danger");
