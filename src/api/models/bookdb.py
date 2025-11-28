@@ -14,6 +14,7 @@ class Book(Base):
 
     genres = Column(ARRAY(String), default=[])
     total_copies = Column(Integer, default=1)
+    reserved_count = Column(Integer, default=0)
 
     cover_image = Column(String, nullable=True)
 

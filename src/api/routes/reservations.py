@@ -1,18 +1,24 @@
+# src/api/routes/reservations.py
 from fastapi import APIRouter, HTTPException, status, Response, Depends, Header
 from pydantic import BaseModel
 from uuid import UUID, uuid4
 from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from secrets import token_urlsafe
 
 from src.core.database import get_async_session
-from src.api.models.user import User
+from src.core.security import hash_password
+from src.api.models.user import User, UserRole
 from src.api.models.bookdb import Book
 from src.api.models.reservation import Reservation
 
-
 router = APIRouter()
 
+
+# --------------------------
+#  Schemas
+# --------------------------
 
 class ReservationCreate(BaseModel):
     user_id: UUID | None = None
@@ -48,37 +54,58 @@ async def create_reservation(
         user_email: str | None = Depends(get_user_email),
         session: AsyncSession = Depends(get_async_session)
 ):
-    # USER ID autoselect via email
+    # --------------------------
+    #  Resolve user
+    # --------------------------
     user_id = payload.user_id
 
     if user_id is None:
         if not user_email:
-            raise HTTPException(400, "Provide user_id or X-User-Email header")
+            raise HTTPException(status_code=400, detail="Provide user_id or X-User-Email header")
 
-        # find user by email
         result = await session.execute(select(User).where(User.email == user_email))
         user = result.scalar_one_or_none()
 
-        # create user if not exists
         if not user:
-            user = User(id=uuid4(), email=user_email)
+            # generate a random password and store its hash so DB NOT NULL constraints are satisfied
+            random_password = token_urlsafe(16)
+            pw_hash = hash_password(random_password)
+
+            user = User(
+                id=uuid4(),
+                email=user_email,
+                password_hash=pw_hash,
+                role=UserRole.user
+            )
             session.add(user)
             await session.commit()
+            await session.refresh(user)
 
         user_id = user.id
     else:
-        # check user exists
         result = await session.execute(select(User).where(User.id == user_id))
         if result.scalar_one_or_none() is None:
-            raise HTTPException(404, "User not found")
+            raise HTTPException(status_code=404, detail="User not found")
 
-    # check book exists
+    # --------------------------
+    #  Resolve book
+    # --------------------------
     result = await session.execute(select(Book).where(Book.id == payload.book_id))
     book = result.scalar_one_or_none()
-    if not book:
-        raise HTTPException(404, "Book not found")
 
-    # create reservation
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    # --------------------------
+    #  Check availability
+    # --------------------------
+    available = (book.total_copies or 0) - (book.reserved_count or 0)
+    if available <= 0:
+        raise HTTPException(status_code=409, detail="No copies available")
+
+    # --------------------------
+    #  Create reservation
+    # --------------------------
     reservation = Reservation(
         id=uuid4(),
         user_id=user_id,
@@ -88,15 +115,38 @@ async def create_reservation(
     )
 
     session.add(reservation)
-    await session.commit()
 
-    return ReservationOut(
-        id=reservation.id,
-        user_id=reservation.user_id,
-        book_id=reservation.book_id,
-        from_date=reservation.from_date,
-        until=reservation.until,
+    # update reserved_count and persist
+    # ensure reserved_count isn't None
+    if book.reserved_count is None:
+        book.reserved_count = 0
+    book.reserved_count += 1
+
+    await session.commit()
+    await session.refresh(reservation)
+
+    return reservation
+
+@router.get("/", response_model=list[ReservationOut])
+async def get_reservations(
+        user_email: str | None = Depends(get_user_email),
+        session: AsyncSession = Depends(get_async_session)
+):
+    if not user_email:
+        raise HTTPException(status_code=400, detail="X-User-Email header required")
+
+    result = await session.execute(
+        select(User).where(User.email == user_email)
     )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return []
+
+    result = await session.execute(
+        select(Reservation).where(Reservation.user_id == user.id)
+    )
+    return result.scalars().all()
 
 
 # --------------------------
@@ -112,7 +162,14 @@ async def cancel_reservation(
     reservation = result.scalar_one_or_none()
 
     if not reservation:
-        raise HTTPException(404, "Reservation not found")
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    # return copy
+    result = await session.execute(select(Book).where(Book.id == reservation.book_id))
+    book = result.scalar_one_or_none()
+
+    if book and (book.reserved_count or 0) > 0:
+        book.reserved_count -= 1
 
     await session.delete(reservation)
     await session.commit()
