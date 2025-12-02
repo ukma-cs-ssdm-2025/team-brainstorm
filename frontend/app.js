@@ -5,6 +5,26 @@ function addListener(selector, event, handler) {
   const el = $(selector);
   if (el) el.addEventListener(event, handler);
 }
+addListener("#clearReservations", "click", async () => {
+    if (!confirm("Очистити всі резервації?")) return;
+
+    try {
+        await fetch(`${apiBase()}/reservations/clear/all`, {
+            method: "DELETE",
+            headers: getAuthHeaders(),
+        });
+
+        await loadReservations();
+        await loadReservedBooks();
+        await loadBooks();
+
+        showToast("Усі резервації очищено", "info");
+
+    } catch (err) {
+        showToast("Помилка очищення", "danger");
+    }
+});
+
 
 function apiBase() {
   const baseEl = $("#apiBase");
@@ -118,10 +138,12 @@ async function registerUser() {
     }
 
     const loginData = await loginRes.json();
+    console.log("AUTO LOGIN RESPONSE:", loginData);
+
+    // <-- ТУТ СЕРВЕР ПОВЕРТАЄ loginData.access_token
     storeToken(loginData.access_token);
     updateAuthUI(email);
 
-    // redirect to dashboard
     window.location.href = "index.html";
   } catch (e) {
     if (msg) msg.textContent = `❌ ${e.message}`;
@@ -152,11 +174,14 @@ async function loginUser() {
     }
 
     const data = await res.json();
+    console.log("LOGIN RESPONSE:", data);
+
+    // <-- ТУТ БЕРЕМО data.access_token
     storeToken(data.access_token);
     updateAuthUI(email);
+
     if (msg) msg.textContent = "✅ Вхід успішний";
 
-    // if we're on auth page, go to dashboard
     if (location.pathname.endsWith("auth.html")) {
       window.location.href = "index.html";
     }
@@ -438,6 +463,43 @@ async function countFavorites() {
   }
 }
 
+async function loadReservedBooks() {
+    try {
+        const res = await fetch(`${apiBase()}/reservations/me`, {
+            headers: getAuthHeaders(),
+        });
+
+        if (!res.ok) {
+            console.error("Помилка завантаження резервацій:", await res.text());
+            return;
+        }
+
+        const data = await res.json();
+        const container = document.getElementById("reservedBooksList");
+        container.innerHTML = "";
+
+        data.forEach(item => {
+            const endTime = item.until
+                ? new Date(item.until).toLocaleDateString("uk-UA")
+                : "—";
+
+            const div = document.createElement("div");
+            div.classList.add("reserved-item");
+
+            div.innerHTML = `
+                <strong>${item.book?.title || "Без назви"}</strong><br>
+                До: <span class="time">${endTime}</span>
+            `;
+
+            container.appendChild(div);
+        });
+
+    } catch (err) {
+        console.error("loadReservedBooks error:", err);
+    }
+}
+
+
 async function clearFavorites() {
   const ok = confirm("Очистити вибране?");
   if (!ok) return;
@@ -479,6 +541,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedEmail = getStoredEmail();
   if (token && savedEmail) {
     updateAuthUI(savedEmail);
+
+    // Довантажуємо все, що потрібно авторизованому користувачу
+    loadReservations();
+    loadFavorites();
+    loadReservedBooks();
   } else {
     updateAuthUI(null);
   }
