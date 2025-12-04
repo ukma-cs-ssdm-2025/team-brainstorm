@@ -346,7 +346,7 @@ function addReservationToList(res) {
         <div class="muted small">Книга ID: ${escapeHtml(res.book_id)}</div>
         <div class="muted small">Користувач: ${escapeHtml(res.user_email || userEmail() || "—")}</div>
         <div class="muted small">Статус: ${escapeHtml(res.status)}</div>
-        <div class="muted small">Створено: ${escapeHtml(res.created_at || "—")}</div>
+        <div class="muted small">Створено: ${escapeHtml(res.from_date || "—")}</div>
       </div>
       <div class="actions">
         <button class="btn btn-outline cancel-res-btn" data-id="${escapeHtml(res.id)}">Скасувати</button>
@@ -463,6 +463,71 @@ async function countFavorites() {
   }
 }
 
+async function searchByGenres() {
+    const genres = $("#genres").value
+      .split(",")
+      .map((g) => g.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (genres.length === 0) {
+        showToast("Введіть жанр для пошуку", "warning");
+        return;
+    }
+
+    const url = new URL(`${apiBase()}/books/search`, window.location.origin);
+    genres.forEach((g) => url.searchParams.append("genres", g));
+
+    try {
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(await res.text());
+
+        const books = await res.json();
+        const list = $("#books");
+
+        list.innerHTML = "";
+
+        books.forEach(renderBook);
+
+    } catch (e) {
+        showToast("Помилка пошуку за жанрами", "danger");
+    }
+}
+function renderBook(b) {
+  const list = $("#books");
+  const li = document.createElement("li");
+  const available = b.total_copies - b.reserved_count;
+
+  li.innerHTML = `
+    <div class="book">
+      <div>
+        <div class="title">${escapeHtml(b.title)}</div>
+        <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
+        <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "—")}</div>
+        <div class="muted small">ID: ${escapeHtml(b.id)}</div>
+        <div class="muted small">Статус: ${available > 0 ? "✅ Доступна" : "⛔ Зарезервована"}</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-outline reserve-btn" data-id="${escapeHtml(b.id)}"
+          ${available > 0 ? "" : "disabled"}>
+          Резервувати
+        </button>
+
+        <button class="btn btn-outline fav-btn" data-id="${escapeHtml(b.id)}">
+          У вибране
+        </button>
+      </div>
+    </div>
+  `;
+
+  // прив'язуємо ті ж самі події — як у loadBooks()
+  li.querySelector(".reserve-btn")?.addEventListener("click", reserveHandler);
+  li.querySelector(".fav-btn")?.addEventListener("click", favoriteHandler);
+
+  list.appendChild(li);
+}
+
+
 async function loadReservedBooks() {
     try {
         const res = await fetch(`${apiBase()}/reservations/me`, {
@@ -527,6 +592,7 @@ function escapeHtml(s) {
 document.addEventListener("DOMContentLoaded", () => {
   // Books / favorites / reservations — only if elements exist
   addListener("#loadBooks", "click", loadBooks);
+  addListener("#searchByGenres", "click", searchByGenres);
   addListener("#loadFavs", "click", loadFavorites);
   addListener("#countFavs", "click", countFavorites);
   addListener("#clearFavs", "click", clearFavorites);
