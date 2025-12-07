@@ -66,3 +66,16 @@ def validate_password(password: str) -> None:
 
     if not has_digit:
         raise ValueError("Пароль має містити хоча б одну цифру")
+
+def decode_token(token: str) -> dict:
+    """
+    Декодує JWT-токен.
+    Повертає словник payload або кидає ValueError, якщо токен недійсний.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token expired")
+    except jwt.JWTError:
+        raise ValueError("Invalid token")

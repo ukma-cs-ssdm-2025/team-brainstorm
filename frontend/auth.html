@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Вхід / Реєстрація</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+</head>
+<body class="auth-shell">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">LF</div>
+        <div>
+          <strong>Library Brainstorm</strong>
+          <p class="muted">Цифрова Бібліотека</p>
+        </div>
+      </div>
+      <div class="auth-inline header-status">
+        <span id="currentUser">Вхід</span>
+        <button class="btn btn-outline" id="logoutBtn" style="display:none">Вийти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="auth-main">
+    <section class="auth-panel card compact-card">
+      <div class="card-header">
+        <h2>Вхід та реєстрація</h2>
+        <p class="muted">Реєструйтесь або увійдіть, щоби резервувати книги.</p>
+      </div>
+
+      <div class="auth-grid">
+        <div class="auth-block">
+          <h3>Реєстрація</h3>
+          <input type="email" id="reg-email" class="input" placeholder="Email" />
+          <input type="password" id="reg-password" class="input" placeholder="Пароль (мінімум 8)" />
+          <select id="reg-role" class="input">
+            <option value="user">Читач</option>
+            <option value="librarian">Бібліотекар</option>
+          </select>
+          <button class="btn btn-primary" id="register-btn">Створити акаунт</button>
+        </div>
+
+        <div class="auth-block">
+          <h3>Вхід</h3>
+          <input type="email" id="login-email" class="input" placeholder="Email" />
+          <input type="password" id="login-password" class="input" placeholder="Пароль" />
+          <button class="btn btn-primary" id="login-btn">Увійти</button>
+          <p class="muted small-note">Email підтверджуєте через поле <em>User Email</em>.</p>
+        </div>
+      </div>
+
+      <p id="auth-message" class="message" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <div class="hidden-inputs" aria-hidden="true">
+    <input type="hidden" id="apiBase" value="/api" />
+    <input type="hidden" id="userEmail" />
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js?v=3"></script>
+</body>
+</html>
