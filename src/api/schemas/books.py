@@ -10,6 +10,7 @@ class BookBase(BaseModel):
     isbn: str
     total_copies: int
     genres: List[str] = []
+    cover_image: Optional[str] = None
 
 
 class BookCreate(BookBase):
