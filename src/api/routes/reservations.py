@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_async_session
+from src.core.mailer import send_email
 from src.core.security import hash_password
 from src.api.models.user import User, UserRole
 from src.api.models.bookdb import Book
@@ -95,6 +96,28 @@ async def create_reservation(
         from_date=date.today(),
         until=date.today() + timedelta(days=1)
     )
+
+    session.add(reservation)
+
+    if book.reserved_count is None:
+        book.reserved_count = 0
+    book.reserved_count += 1
+
+    await session.commit()
+    await session.refresh(reservation)
+
+    # ⬇⬇⬇ ДОДАЄМО EMAIL-ПОВІДОМЛЕННЯ ⬇⬇⬇
+
+    formatted_date = reservation.until.strftime("%d.%m.%Y")
+    subject = "Резервація книги"
+    message = (
+        f"Вітаємо!\n\n"
+        f"Книга «{book.title}» успішно зарезервована.\n"
+        f"Резервація діє до: {formatted_date}.\n\n"
+        f"Дякуємо, що користуєтесь Library Brainstorm!"
+    )
+
+    await send_email(user.email, subject, message)
 
     session.add(reservation)
 

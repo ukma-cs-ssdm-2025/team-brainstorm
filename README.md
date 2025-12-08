@@ -2,77 +2,148 @@
 
 # 📚 Brainstorm Project
 
-Командний проєкт для управління бібліотекою.  
-Розробляється в рамках курсу (НаУКМА).
+> Командний проєкт для управління бібліотекою  
+> Розробляється в рамках курсу Software System Design and Modeling (НаУКМА)
 
+---
 
-Супроводжувач репозиторію (Repo Maintainer) - Федін Володимир
+## 👥 Команда
 
-Супроводжувач CI (CI Maintainer) - Виговський Владислав 
+| Учасник |
+---------|
+| Федін Володимир |
+| Виговський Владислав |
+| Зінченко Вероніка |
+| Ковтонюк Анастасія |
+---
 
-Керівник документації (Documentation Lead) - Зінченко Вероніка
+## 📂 Структура проєкту
 
-Керівник трекера завдань (Issue Tracker Lead) - Ковтонюк Анастасія
+```
+team-brainstorm/
+├── docs/                    # Документація
+│   ├── api/                 # API специфікації
+│   ├── architecture/        # Архітектурні рішення
+│   ├── code-quality/        # Звіти про якість коду
+│   ├── requirements/        # Вимоги та RTM
+│   ├── refactoring/         # Документація рефакторингу
+│   ├── reliability/         # Тестування надійності
+│   ├── testing/             # Тестова документація
+│   └── validation/          # Валідація вимог
+├── src/                     # Вихідний код
+│   ├── api/                 # API endpoints
+│   ├── core/                # Основна бізнес-логіка
+│   ├── data/                # Робота з даними
+│   └── services/            # Сервіси
+├── tests/                   # Тести
+├── Labs/                    # Лабораторні роботи (Lab01-Lab10)
+├── frontend/                # Frontend код
+├── data/                    # Дані та фікстури
+└── requirements.txt         # Python залежності
+```
 
-Керівник вимогг (Requirements Lead) - Ковтонюк Анастасія
+---
 
-Керівник якості (Quality Lead) - Федін Володимир
+## 📚 Документація
 
-Керівник простежуваності (Traceability Lead) - Виговський Владислав 
+### 🎯 API
+Всі артефакти: [`docs/api/`](docs/api/)
+- [API Design](docs/api/api-design.md) - Дизайн REST API
+- [OpenAPI Specification](docs/api/openapi-generated.yaml) - Автогенерована специфікація
+- [Quality Attributes](docs/api/quality-attributes.md) - Атрибути якості
+- [Interactive Docs](docs/api/index.html) - Інтерактивна документація
 
-Керівник документації (Documentation Lead) - Зінченко Вероніка
+### 🏗️ Архітектура
+Всі артефакти: [`docs/architecture/`](docs/architecture/)
+- [High-Level Design](docs/architecture/high-level-design.md) - Загальний дизайн системи
+- [Traceability Matrix](docs/architecture/traceability-matrix.md) - Матриця простежуваності
+- [UML Diagrams](docs/architecture/) - Діаграми класів, компонентів та послідовностей
 
+### ✅ Якість коду
+Всі артефакти: [`docs/code-quality/`](docs/code-quality/)
+- [Progress Report](docs/code-quality/progress.md) - Прогрес покращення якості
+- [Review Report](docs/code-quality/review-report.md) - Звіти code review
+- [Static Analysis](docs/code-quality/static-analysis.md) - Результати статичного аналізу
 
-## 📂Артефакти
+### 📋 Вимоги
+Всі артефакти: [`docs/requirements/`](docs/requirements/)
+- [Requirements](docs/requirements/requirements.md) - Функціональні та нефункціональні вимоги
+- [Quality Scenarios](docs/requirements/quality-scenarios.md) - Сценарії якості
+- [RTM (Requirements Traceability Matrix)](docs/requirements/rtm.md) - Матриця простежуваності вимог
 
-Усі артефакти зберігаються в каталозі [`docs/api/`](docs/api/):
-- [api-design](docs/api/api-design.md)
-- [index](docs/api/index.html)
-- [openapi-generated](docs/api/openapi-generated.yaml)
-- [quality-attributes](docs/api/quality-attributes.md)
+### 🔧 Рефакторинг
+Всі артефакти: [`docs/refactoring/`](docs/refactoring/)
 
-## Architecture
+### 🧪 Тестування
+Всі артефакти: [`docs/testing/`](docs/testing/)
 
-Усі артефакти зберігаються в каталозі [`docs/architecture/`](docs/architecture/):
-- [high-level-design](docs/architecture/high-level-design.md)
-- [traceability-matrix](docs/architecture/traceability-matrix.md)
-- [uml1](docs/architecture/uml1)
-- [uml2](docs/architecture/uml2)
-- [uml3](docs/architecture/uml3)
+### ✔️ Валідація
+Всі артефакти: [`docs/validation/`](docs/validation/)
 
-## Code-quality
-
-Усі артефакти зберігаються в каталозі [`docs/code-quality/`](docs/code-quality/):
-- [progress](docs/code-quality/progress.md)
-- [review-report](docs/code-quality/review-report.md)
-- [static-analysis](docs/code-quality/static-analysis.md)
-
-## Requirements
-
-Усі артефакти зберігаються в каталозі [`docs/requirements/`](docs/requirements/):
-- [quality-scenarios](docs/requirements/quality-scenarios.md)
-- [requirements](docs/requirements/requirements.md)
-- [rtm](docs/requirements/rtm.md)
+---
 
 - ## ⚙️ Як запустити
+### Передумови
+- Python 3.10+
+- Git
+
+### Встановлення та запуск
+
 ```bash
-# Клонувати репозиторій
+# 1. Клонувати репозиторій
 git clone https://github.com/ukma-cs-ssdm-2025/team-brainstorm.git
 cd team-brainstorm
 
-# Створити віртуальне середовище
-python -m venv venv
-source venv/bin/activate   # або venv\Scripts\activate на Windows
+# 2. Створити віртуальне середовище
+python -m venv .venv
 
-# Встановити залежності
+# 3. Активувати віртуальне середовище
+# Windows:
+.venv\Scripts\activate
+# Linux/Mac:
+source .venv/bin/activate
+
+# 4. Встановити залежності
 pip install -r requirements.txt
 
-# Запустити локально
+# 5. Запустити сервер
 uvicorn src.api.main:app --reload
 ```
 
-API буде доступне за адресою:  
-👉 http://127.0.0.1:8000/docs
+**API буде доступне за адресою:**  
+👉 **http://127.0.0.1:8000**  
+📄 **Документація:** http://127.0.0.1:8000/docs
+
+---
+## 🧪 Тестування
+
+```bash
+# Запустити всі тести
+pytest
+
+# Запустити з покриттям
+pytest --cov=src --cov-report=html
+
+# Запустити конкретний тест
+pytest tests/test_api.py::test_specific_function
+
+# Запустити тести з verbose
+pytest -v
+```
+
+---
+
+## 📊 CI/CD
+
+Проєкт використовує GitHub Actions для автоматизації:
+
+- ✅ Lint перевірки (flake8, black)
+- ✅ Type checking (mypy)
+- ✅ Unit тести (pytest)
+- ✅ Integration тести
+- ✅ Coverage звіти
+
+Цей проєкт розроблено для освітніх цілей в НаУКМА.
 
 
 ## 📝 Політика розробки
@@ -80,8 +151,4 @@ API буде доступне за адресою:
 - **Статичний аналіз**: mypy  
 - **Обов’язкові PR-и**: мінімум 1 approve    
 
-## 👥 Команда
-- Зінченко Вероніка
-- Федін Володимир   
-- Ковтонюк Анастасія
-- Виговський Владислав 
+Розроблено з ❤️ командою Brainstorm | НаУКМА 2025-2026

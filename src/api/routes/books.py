@@ -1,3 +1,4 @@
+import uuid
 from uuid import UUID
 
 from src.core.database import SessionLocal, async_session_maker
@@ -76,4 +77,5 @@ async def update_book(book_id: UUID, data: BookUpdate):
         await db.commit()
         await db.refresh(book)
         return BookResponse.from_orm(book)
+
 

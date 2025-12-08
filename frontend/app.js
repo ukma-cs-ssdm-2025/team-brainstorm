@@ -222,7 +222,7 @@ async function loadBooks() {
       .map((g) => g.trim())
       .filter(Boolean);
 
-    const url = new URL(`${apiBase().replace(/\/$/, "")}/books/`, window.location.origin);
+    const url = new URL(`${apiBase().replace(/\/$/, "")}/books/search`, window.location.origin);
     if (availableOnly) url.searchParams.set("available_only", "true");
     genres.forEach((g) => url.searchParams.append("genres", g));
 
@@ -463,35 +463,7 @@ async function countFavorites() {
   }
 }
 
-async function searchByGenres() {
-    const genres = $("#genres").value
-      .split(",")
-      .map((g) => g.trim().toLowerCase())
-      .filter(Boolean);
 
-    if (genres.length === 0) {
-        showToast("Введіть жанр для пошуку", "warning");
-        return;
-    }
-
-    const url = new URL(`${apiBase()}/books/search`, window.location.origin);
-    genres.forEach((g) => url.searchParams.append("genres", g));
-
-    try {
-        const res = await fetch(url, { headers: getAuthHeaders() });
-        if (!res.ok) throw new Error(await res.text());
-
-        const books = await res.json();
-        const list = $("#books");
-
-        list.innerHTML = "";
-
-        books.forEach(renderBook);
-
-    } catch (e) {
-        showToast("Помилка пошуку за жанрами", "danger");
-    }
-}
 function renderBook(b) {
   const list = $("#books");
   const li = document.createElement("li");
@@ -592,7 +564,6 @@ function escapeHtml(s) {
 document.addEventListener("DOMContentLoaded", () => {
   // Books / favorites / reservations — only if elements exist
   addListener("#loadBooks", "click", loadBooks);
-  addListener("#searchByGenres", "click", searchByGenres);
   addListener("#loadFavs", "click", loadFavorites);
   addListener("#countFavs", "click", countFavorites);
   addListener("#clearFavs", "click", clearFavorites);

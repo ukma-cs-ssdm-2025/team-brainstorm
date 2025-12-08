@@ -24,6 +24,7 @@ six==1.17.0
 pyasn1==0.6.1
 email-validator>=2,<3
 idna==3.11
+aiosmtplib==2.0.2
 
 
 uvicorn==0.30.6
