@@ -20,21 +20,24 @@ async def seed():
                 "author": "Andrew Hunt, David Thomas",
                 "isbn": "978-0201616224",
                 "genres": ["programming", "software"],
-                "total_copies": 5
+                "total_copies": 5,
+                "cover_image": "/static/covers/pragmatic.jpg",
             },
             {
                 "title": "Clean Code",
                 "author": "Robert C. Martin",
                 "isbn": "978-0132350884",
                 "genres": ["programming"],
-                "total_copies": 3
+                "total_copies": 3,
+                "cover_image": "/static/covers/clean.png",
             },
             {
                 "title": "Дота 2 для чайників",
                 "author": "Шадоу Рейз",
                 "isbn": "978-0132353254532",
                 "genres": ["sci-fi", "gaming"],
-                "total_copies": 100000
+                "total_copies": 100000,
+                "cover_image": "/static/covers/dota2.png",
             },
         ]
 
@@ -51,10 +54,14 @@ async def seed():
                     genres=data["genres"],
                     total_copies=data["total_copies"],
                     reserved_count=0,        # важливо!
+                    cover_image=data.get("cover_image"),
                 )
                 session.add(book)
                 print(f"[ADDED] Book: {book.title}")
             else:
+                cover = data.get("cover_image")
+                if cover:
+                    existing.cover_image = cover
                 print(f"[SKIP] Book already exists: {existing.title}")
 
         # ---------------------------

@@ -45,6 +45,44 @@ function showToast(message, kind = "info", timeout = 2500) {
   showToast._timer = setTimeout(() => (t.className = "toast"), timeout);
 }
 
+function getCoverUrl(book) {
+  if (book.cover_image) return book.cover_image;
+  if (book.isbn) {
+    return `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(
+      book.isbn
+    )}-L.jpg?default=false`;
+  }
+  return "";
+}
+
+function renderCover(book) {
+  const coverUrl = getCoverUrl(book);
+  const title = escapeHtml(book.title || "книгу");
+
+  if (!coverUrl) {
+    return `<div class="book__cover">
+      <div class="book__cover--blank">Обкладинка</div>
+    </div>`;
+  }
+
+  return `
+    <div class="book__cover" data-has-cover>
+      <img
+        src="${coverUrl}"
+        alt="Обкладинка ${title}"
+        onload="this.closest('.book__cover')?.classList.add('is-loaded')"
+        onerror="this.style.display='none'; this.closest('.book__cover')?.classList.add('is-broken')"
+      />
+      <div class="book__cover--blank">Обкладинка</div>
+    </div>
+  `;
+}
+
+let currentReviewBookId = null;
+let currentReviewBookTitle = "";
+let selectedReviewRating = 0;
+let reviewRatingStars = [];
+
 // ---------- AUTH helpers ----------
 function storeToken(token) {
   if (token) localStorage.setItem("token", token);
@@ -86,6 +124,9 @@ function updateAuthUI(email) {
     if (emailInput) emailInput.value = "";
     storeEmail(null);
   }
+  if (typeof updateReviewFormState === "function") {
+    updateReviewFormState();
+  }
 }
 
 
@@ -123,7 +164,7 @@ async function registerUser() {
       throw new Error(err.detail || "Помилка реєстрації");
     }
 
-    if (msg) msg.textContent = "✅ Реєстрація успішна. Логінемо вас...";
+    if (msg) msg.textContent = "Реєстрація успішна. Логінемо вас...";
 
     // auto-login after registration
     const loginRes = await fetch(`${apiBase()}/users/login`, {
@@ -133,7 +174,7 @@ async function registerUser() {
     });
 
     if (!loginRes.ok) {
-      if (msg) msg.textContent = "✅ Реєстрація успішна. Тепер увійдіть вручну.";
+      if (msg) msg.textContent = "Реєстрація успішна. Тепер увійдіть вручну.";
       return;
     }
 
@@ -146,7 +187,7 @@ async function registerUser() {
 
     window.location.href = "index.html";
   } catch (e) {
-    if (msg) msg.textContent = `❌ ${e.message}`;
+    if (msg) msg.textContent = `error ${e.message}`;
   }
 }
 
@@ -180,13 +221,13 @@ async function loginUser() {
     storeToken(data.access_token);
     updateAuthUI(email);
 
-    if (msg) msg.textContent = "✅ Вхід успішний";
+    if (msg) msg.textContent = " Вхід успішний";
 
     if (location.pathname.endsWith("auth.html")) {
       window.location.href = "index.html";
     }
   } catch (e) {
-    if (msg) msg.textContent = `❌ ${e.message}`;
+    if (msg) msg.textContent = `error ${e.message}`;
   }
 }
 
@@ -237,16 +278,16 @@ async function loadBooks() {
     // --- Генерація списку ---
     books.forEach((b) => {
       const li = document.createElement("li");
+      li.dataset.bookId = b.id;
       const available = b.total_copies - b.reserved_count;
-
       li.innerHTML = `
         <div class="book">
+          ${renderCover(b)}
           <div>
             <div class="title">${escapeHtml(b.title)}</div>
             <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
-            <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "—")}</div>
-            <div class="muted small">ID: ${escapeHtml(b.id)}</div>
-            <div class="muted small">  Статус: ${available > 0 ? "✅ Доступна" : "⛔ Зарезервована"}</div>
+            <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "-")}</div>
+            <div class="muted small">  Статус: ${available > 0 ? " Доступна" : " Зарезервована"}</div>
           </div>
 
           <div class="actions">
@@ -262,6 +303,12 @@ async function loadBooks() {
               data-id="${escapeHtml(b.id)}">
               У вибране
             </button>
+            <button
+              class="btn btn-ghost review-btn"
+              data-id="${escapeHtml(b.id)}"
+              data-title="${escapeHtml(b.title)}">
+              Відгуки
+            </button>
           </div>
         </div>
       `;
@@ -270,7 +317,8 @@ async function loadBooks() {
       li.querySelector(".reserve-btn")?.addEventListener("click", async (e) => {
         const id = e.currentTarget.dataset.id;
 
-        if (!confirm(`Зарезервувати книгу ID ${id}?`)) return;
+        const bookTitle = escapeHtml(b.title || "книгу");
+        if (!confirm(`Зарезервувати "${bookTitle}"?`)) return;
 
         const button = e.currentTarget;
         button.setAttribute("aria-busy", "true");
@@ -326,9 +374,13 @@ async function loadBooks() {
           button.removeAttribute("aria-busy");
         }
       });
+      li.querySelector(".review-btn")?.addEventListener("click", () => {
+        selectReviewTarget({ id: b.id, title: b.title });
+      });
 
       list.appendChild(li);
     });
+    highlightActiveBookCard();
   } catch (e) {
     showToast("Не вдалося завантажити книги", "danger");
   } finally {
@@ -343,8 +395,7 @@ function addReservationToList(res) {
     <div class="fav">
       <div>
         <div class="title">Резервація</div>
-        <div class="muted small">Книга ID: ${escapeHtml(res.book_id)}</div>
-        <div class="muted small">Користувач: ${escapeHtml(res.user_email || userEmail() || "—")}</div>
+        <div class="muted small">Користувач: ${escapeHtml(res.user_email || userEmail() || "-")}</div>
         <div class="muted small">Статус: ${escapeHtml(res.status)}</div>
         <div class="muted small">Створено: ${escapeHtml(res.from_date || "—")}</div>
       </div>
@@ -356,7 +407,8 @@ function addReservationToList(res) {
 
   item.querySelector(".cancel-res-btn")?.addEventListener("click", async (e) => {
     const id = e.currentTarget.dataset.id;
-    const ok = confirm(`Скасувати резервацію ID ${id}?`);
+    const bookTitle = escapeHtml(res.book?.title || "книгу");
+    const ok = confirm(`Скасувати резервацію "${bookTitle}"?`);
     if (!ok) return;
     const button = e.currentTarget;
     button.setAttribute("aria-busy", "true");
@@ -412,7 +464,6 @@ async function loadFavorites() {
           <div>
             <div class="title">${escapeHtml(b.title)}</div>
             <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
-            <div class="muted small">ID: ${escapeHtml(b.id)}</div>
           </div>
           <div class="actions">
             <button class="btn btn-outline remove-fav-btn" data-id="${escapeHtml(b.id)}">Прибрати</button>
@@ -421,7 +472,8 @@ async function loadFavorites() {
       `;
       item.querySelector(".remove-fav-btn")?.addEventListener("click", async (e) => {
         const id = e.currentTarget.dataset.id;
-        const ok = confirm(`Прибрати з вибраного книгу ID ${id}?`);
+        const title = escapeHtml(b.title || "книгу");
+        const ok = confirm(`Прибрати "${title}" з вибраного?`);
         if (!ok) return;
         const button = e.currentTarget;
         button.setAttribute("aria-busy", "true");
@@ -471,11 +523,11 @@ function renderBook(b) {
 
   li.innerHTML = `
     <div class="book">
+      ${renderCover(b)}
       <div>
         <div class="title">${escapeHtml(b.title)}</div>
         <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
         <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "—")}</div>
-        <div class="muted small">ID: ${escapeHtml(b.id)}</div>
         <div class="muted small">Статус: ${available > 0 ? "✅ Доступна" : "⛔ Зарезервована"}</div>
       </div>
 
@@ -497,6 +549,212 @@ function renderBook(b) {
   li.querySelector(".fav-btn")?.addEventListener("click", favoriteHandler);
 
   list.appendChild(li);
+}
+
+function pluralizeReviews(count) {
+  const numeric = Number(count);
+  const total = Math.max(0, Number.isFinite(numeric) ? numeric : 0);
+  if (total === 1) return "1 відгук";
+  if (total > 1 && total < 5) return `${total} відгуки`;
+  return `${total} відгуків`;
+}
+
+function formatReviewDate(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("uk-UA", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function highlightActiveBookCard() {
+  document.querySelectorAll("#books li").forEach((li) => {
+    const bookEl = li.querySelector(".book");
+    const isActive = li.dataset.bookId === currentReviewBookId;
+    if (bookEl) {
+      bookEl.classList.toggle("is-active-book", isActive);
+    }
+  });
+}
+
+function selectReviewTarget(book = {}) {
+  if (!book.id) return;
+  const bookId = String(book.id);
+  const isNew = bookId !== currentReviewBookId;
+  currentReviewBookId = bookId;
+  currentReviewBookTitle = book.title || "";
+  const label = $("#reviewTargetLabel");
+  if (label) {
+    label.innerHTML = `Відгуки для <strong>${escapeHtml(currentReviewBookTitle)}</strong>`;
+  }
+  if (isNew) {
+    resetReviewForm();
+  }
+  updateReviewFormState();
+  loadReviewsForBook(currentReviewBookId);
+  highlightActiveBookCard();
+}
+
+async function loadReviewsForBook(bookId) {
+  if (!bookId) return;
+  const summary = $("#reviewSummary");
+  const average = $("#reviewAverageValue");
+  const count = $("#reviewCountBadge");
+  const list = $("#reviewList");
+
+  if (list) {
+    list.innerHTML = `<p class="muted small">Завантаження відгуків...</p>`;
+  }
+
+  try {
+    const resp = await fetch(`${apiBase()}/books/${bookId}/reviews`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!resp.ok) {
+      throw new Error(await resp.text());
+    }
+
+    const data = await resp.json();
+    const averageValue = Number(data.average_rating ?? 0).toFixed(1);
+    average && (average.textContent = averageValue);
+    count && (count.textContent = pluralizeReviews(data.count ?? 0));
+    summary?.classList.remove("hidden");
+
+    if (list) {
+      if (!Array.isArray(data.items) || data.items.length === 0) {
+        list.innerHTML = `<p class="muted small">Поки що немає відгуків. Станьте першим!</p>`;
+      } else {
+        list.innerHTML = "";
+        data.items.forEach((review) => list.appendChild(renderReviewItem(review)));
+      }
+    }
+  } catch (error) {
+    summary?.classList.add("hidden");
+    if (list) {
+      list.innerHTML = `<p class="muted small">Не вдалося завантажити відгуки.</p>`;
+    }
+    const message = error?.message || error;
+    showToast(`Не вдалося завантажити відгуки: ${message}`, "danger");
+  }
+}
+
+function renderReviewItem(review) {
+  const comment = (review.comment || "").trim() || "Без коментаря";
+  const author = review.user_email || "Анонім";
+  const postedAt = formatReviewDate(review.created_at);
+  const card = document.createElement("div");
+  card.className = "review-item";
+  card.innerHTML = `
+    <div class="review-item__header">
+      <div class="review-item__rating">
+        <span aria-hidden="true">★</span>
+        <span>${escapeHtml(String(review.rating ?? 0))}/5</span>
+      </div>
+      <span class="muted small">${escapeHtml(author)}</span>
+    </div>
+    <p class="review-item__comment">${escapeHtml(comment)}</p>
+    <div class="review-item__meta">${escapeHtml(postedAt)}</div>
+  `;
+  return card;
+}
+
+function setReviewRating(value) {
+  selectedReviewRating = value;
+  reviewRatingStars.forEach((star) => {
+    const starValue = Number(star.dataset.value);
+    const isActive = starValue > 0 && starValue <= value;
+    star.classList.toggle("is-active", isActive);
+    star.setAttribute("aria-pressed", String(isActive));
+  });
+  updateReviewFormState();
+}
+
+function resetReviewForm() {
+  setReviewRating(0);
+  const commentInput = $("#reviewComment");
+  if (commentInput) {
+    commentInput.value = "";
+  }
+}
+
+function updateReviewFormState() {
+  const isBookSelected = Boolean(currentReviewBookId);
+  const hasRating = selectedReviewRating > 0;
+  const isAuthed = Boolean(getToken());
+  const submitBtn = $("#submitReviewButton");
+  const commentInput = $("#reviewComment");
+  const hint = $("#reviewFormHint");
+
+  reviewRatingStars.forEach((star) => {
+    star.disabled = !isBookSelected;
+  });
+
+  if (submitBtn) {
+    submitBtn.disabled = !(isBookSelected && hasRating && isAuthed);
+  }
+  if (commentInput) {
+    commentInput.disabled = !isBookSelected;
+  }
+  if (hint) {
+    if (!isBookSelected) {
+      hint.textContent = "Оберіть книгу, щоб залишити відгук.";
+    } else if (!isAuthed) {
+      hint.textContent = "Авторизуйтесь, щоб поділитися відгуком.";
+    } else if (!hasRating) {
+      hint.textContent = "Оберіть оцінку, щоб продовжити.";
+    } else {
+      hint.textContent = "Додайте коментар та натисніть «Поділитися враженнями».";
+    }
+  }
+}
+
+async function handleReviewSubmit(event) {
+  event.preventDefault();
+  if (!currentReviewBookId) {
+    showToast("Оберіть книгу, до якої хочете залишити відгук.", "info");
+    return;
+  }
+  if (selectedReviewRating === 0) {
+    showToast("Оберіть оцінку перед публікацією.", "info");
+    return;
+  }
+
+  const commentInput = $("#reviewComment");
+  const payload = {
+    rating: selectedReviewRating,
+    comment: commentInput ? commentInput.value.trim() : "",
+  };
+  const button = $("#submitReviewButton");
+  button?.setAttribute("aria-busy", "true");
+
+  try {
+    const resp = await fetch(`${apiBase()}/books/${currentReviewBookId}/reviews`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(text || "Не вдалося додати відгук.");
+    }
+
+    await loadReviewsForBook(currentReviewBookId);
+    resetReviewForm();
+    showToast("Відгук додано", "success");
+  } catch (error) {
+    const message = error?.message || error;
+    showToast(`Не вдалося додати відгук: ${message}`, "danger");
+  } finally {
+    button?.removeAttribute("aria-busy");
+  }
 }
 
 
@@ -562,13 +820,23 @@ function escapeHtml(s) {
 
 // ---------- Init / events ----------
 document.addEventListener("DOMContentLoaded", () => {
-  // Books / favorites / reservations — only if elements exist
+  // Books / favorites / reservations – only if elements exist
   addListener("#loadBooks", "click", loadBooks);
   addListener("#loadFavs", "click", loadFavorites);
   addListener("#countFavs", "click", countFavorites);
   addListener("#clearFavs", "click", clearFavorites);
 
-  // Auth buttons — only if elements exist
+  reviewRatingStars = Array.from(document.querySelectorAll(".rating-input__star"));
+  reviewRatingStars.forEach((star) => {
+    star.addEventListener("click", () => {
+      if (star.disabled) return;
+      setReviewRating(Number(star.dataset.value));
+    });
+  });
+  const reviewForm = $("#reviewForm");
+  reviewForm?.addEventListener("submit", handleReviewSubmit);
+
+  // Auth buttons – only if elements exist
   addListener("#register-btn", "click", registerUser);
   addListener("#login-btn", "click", loginUser);
   addListener("#logoutBtn", "click", logout);
@@ -593,4 +861,5 @@ document.addEventListener("DOMContentLoaded", () => {
   if (onDashboard && !token) {
     window.location.href = "auth.html";
   }
+  updateReviewFormState();
 });

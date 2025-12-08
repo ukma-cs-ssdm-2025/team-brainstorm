@@ -90,6 +90,42 @@
                     </div>
                     <ul class="list compact-list" id="favorites"></ul>
                 </section>
+                <section class="card compact-card review-panel" id="reviewPanel">
+                    <div class="card-header">
+                        <h2>Відгуки та рейтинги</h2>
+                        <p class="muted small" id="reviewTargetLabel">Оберіть книгу, щоб переглянути відгуки.</p>
+                        <div class="review-summary hidden" id="reviewSummary">
+                            <div class="review-summary__average">
+                                <span class="review-summary__value" id="reviewAverageValue">0.0</span>
+                                <span class="muted small">середній рейтинг</span>
+                            </div>
+                            <span class="badge" id="reviewCountBadge">0 відгуків</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="review-list" id="reviewList">
+                            <p class="muted small">Оберіть книгу, щоб побачити відгуки.</p>
+                        </div>
+                        <form id="reviewForm" class="review-form">
+                            <label class="review-form__label">
+                                <span>Ваша оцінка</span>
+                                <div class="rating-input" role="radiogroup" aria-label="Оцінка книги">
+                                    <button type="button" class="rating-input__star" data-value="1" aria-label="1 зірка">★</button>
+                                    <button type="button" class="rating-input__star" data-value="2" aria-label="2 зірки">★</button>
+                                    <button type="button" class="rating-input__star" data-value="3" aria-label="3 зірки">★</button>
+                                    <button type="button" class="rating-input__star" data-value="4" aria-label="4 зірки">★</button>
+                                    <button type="button" class="rating-input__star" data-value="5" aria-label="5 зірок">★</button>
+                                </div>
+                            </label>
+                            <label class="review-form__label">
+                                <span>Коментар</span>
+                                <textarea id="reviewComment" rows="3" placeholder="Розкажіть, чим книга вас зачепила" disabled></textarea>
+                            </label>
+                            <button type="submit" class="btn btn-primary" id="submitReviewButton" disabled>Поділитися враженнями</button>
+                            <p class="muted small review-form__hint" id="reviewFormHint">Оберіть книгу, щоб залишити відгук.</p>
+                        </form>
+                    </div>
+                </section>
             </div>
         </section>
     </main>
