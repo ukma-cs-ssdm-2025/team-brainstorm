@@ -123,7 +123,7 @@ async function registerUser() {
       throw new Error(err.detail || "Помилка реєстрації");
     }
 
-    if (msg) msg.textContent = "✅ Реєстрація успішна. Логінемо вас...";
+    if (msg) msg.textContent = "Реєстрація успішна. Логінемо вас...";
 
     // auto-login after registration
     const loginRes = await fetch(`${apiBase()}/users/login`, {
@@ -133,7 +133,7 @@ async function registerUser() {
     });
 
     if (!loginRes.ok) {
-      if (msg) msg.textContent = "✅ Реєстрація успішна. Тепер увійдіть вручну.";
+      if (msg) msg.textContent = "Реєстрація успішна. Тепер увійдіть вручну.";
       return;
     }
 
@@ -146,7 +146,7 @@ async function registerUser() {
 
     window.location.href = "index.html";
   } catch (e) {
-    if (msg) msg.textContent = `❌ ${e.message}`;
+    if (msg) msg.textContent = `error ${e.message}`;
   }
 }
 
@@ -180,13 +180,13 @@ async function loginUser() {
     storeToken(data.access_token);
     updateAuthUI(email);
 
-    if (msg) msg.textContent = "✅ Вхід успішний";
+    if (msg) msg.textContent = " Вхід успішний";
 
     if (location.pathname.endsWith("auth.html")) {
       window.location.href = "index.html";
     }
   } catch (e) {
-    if (msg) msg.textContent = `❌ ${e.message}`;
+    if (msg) msg.textContent = `error ${e.message}`;
   }
 }
 
@@ -246,7 +246,7 @@ async function loadBooks() {
             <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
             <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "—")}</div>
             <div class="muted small">ID: ${escapeHtml(b.id)}</div>
-            <div class="muted small">  Статус: ${available > 0 ? "✅ Доступна" : "⛔ Зарезервована"}</div>
+            <div class="muted small">  Статус: ${available > 0 ? " Доступна" : " Зарезервована"}</div>
           </div>
 
           <div class="actions">
