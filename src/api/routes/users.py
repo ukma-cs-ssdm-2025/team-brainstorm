@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.core.database import get_async_session
 from src.core.security import decode_token
-from src.api.models.user import User
+from src.api.models.user import User, UserRole
 
 router = APIRouter()
 
@@ -75,12 +75,11 @@ async def login(data: UserLogin, session: AsyncSession = Depends(get_async_sessi
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
-async def get_current_user_email(
+async def get_current_user(
         token: str = Depends(oauth2_scheme),
         session: AsyncSession = Depends(get_async_session)
-):
-    """Повертає email користувача, якщо токен валідний."""
-
+) -> User:
+    """Декодує токен і повертає користувача."""
     try:
         payload = decode_token(token)
         user_id: str = payload.get("sub")
@@ -94,7 +93,19 @@ async def get_current_user_email(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
 
-        return user.email
-
+        return user
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+async def get_current_user_email(
+        user: User = Depends(get_current_user),
+):
+    return user.email
+
+
+async def require_librarian(user: User = Depends(get_current_user)) -> User:
+    """Доступ з роллю бібліотекаря тільки."""
+    if user.role != UserRole.librarian:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return user

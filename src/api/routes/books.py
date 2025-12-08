@@ -3,6 +3,7 @@ from uuid import UUID
 
 from src.core.database import SessionLocal, async_session_maker
 from src.api.models.bookdb import Book
+from src.api.models.user import User
 from src.api.schemas.books import BookCreate, BookUpdate, BookResponse
 
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -11,18 +12,22 @@ from sqlalchemy.future import select
 
 # Якщо у тебе async_session_maker і SessionLocal у src.core.database:
 from src.core.database import get_async_session
+from src.api.routes.users import require_librarian
 
 router = APIRouter(tags=["Books"])
 
 @router.get("/search", response_model=list[BookResponse])
 async def search_books(
         genres: list[str] = Query(default=[]),
+        available_only: bool = Query(default=False, alias="available_only"),
         session: AsyncSession = Depends(get_async_session)
 ):
     query = select(Book)
 
     if genres:
         query = query.where(Book.genres.overlap(genres))
+    if available_only:
+        query = query.where(Book.total_copies > Book.reserved_count)
 
     result = await session.execute(query)
     books = result.scalars().all()
@@ -52,7 +57,7 @@ async def get_book(book_id: UUID):
 
 
 @router.post("/", response_model=BookResponse)
-async def create_book(data: BookCreate):
+async def create_book(data: BookCreate, _: User = Depends(require_librarian)):
     async with SessionLocal() as db:
         new_book = Book(**data.dict())
         db.add(new_book)
@@ -63,7 +68,7 @@ async def create_book(data: BookCreate):
 
 
 @router.put("/{book_id}", response_model=BookResponse)
-async def update_book(book_id: UUID, data: BookUpdate):
+async def update_book(book_id: UUID, data: BookUpdate, _: User = Depends(require_librarian)):
     async with SessionLocal() as db:
         result = await db.execute(select(Book).where(Book.id == book_id))
         book = result.scalar_one_or_none()
