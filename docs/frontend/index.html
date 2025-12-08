@@ -135,6 +135,74 @@
     </div>
 </div>
 
+<div id="bookEditModal" class="modal hidden" aria-hidden="true">
+  <div class="modal__backdrop" data-modal-close></div>
+  <div
+    class="modal__window"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bookEditModalTitle"
+  >
+    <header class="modal__header">
+      <div>
+        <p class="muted small">
+          ISBN: <span id="editBookIsbn">—</span>
+        </p>
+        <h3 id="bookEditModalTitle">Редагування книги</h3>
+      </div>
+      <button
+        type="button"
+        class="modal__close"
+        aria-label="Закрити редактор книги"
+        data-modal-close
+      >
+        ×
+      </button>
+    </header>
+    <form id="bookEditForm" class="modal__form" novalidate>
+      <div class="modal__field">
+        <label for="bookEditTitle">Назва</label>
+        <input id="bookEditTitle" name="title" class="input" required />
+      </div>
+      <div class="modal__field">
+        <label for="bookEditAuthor">Автор</label>
+        <input id="bookEditAuthor" name="author" class="input" required />
+      </div>
+      <div class="modal__field">
+        <label for="bookEditDescription">Опис</label>
+        <textarea
+          id="bookEditDescription"
+          name="description"
+          class="input"
+          rows="3"
+        ></textarea>
+      </div>
+      <div class="modal__field modal__field--grid">
+        <label for="bookEditYear">Рік видання</label>
+        <input id="bookEditYear" name="year" type="number" class="input" />
+      </div>
+      <div class="modal__field">
+        <label for="bookEditGenres">Жанри (через кому)</label>
+        <input id="bookEditGenres" name="genres" class="input" />
+      </div>
+      <div class="modal__field modal__field--grid">
+        <label for="bookEditCopies">Кількість примірників</label>
+        <input id="bookEditCopies" name="copies" type="number" class="input" />
+      </div>
+      <div class="modal__field">
+        <label for="bookEditCover">URL обкладинки</label>
+        <input id="bookEditCover" name="cover_image" class="input" />
+      </div>
+      <div class="modal__actions">
+        <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+        <button type="button" class="btn btn-outline" data-modal-close>
+          Скасувати
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="app.js?v=4"></script>
 </body>

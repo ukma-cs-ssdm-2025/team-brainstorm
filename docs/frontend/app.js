@@ -82,6 +82,97 @@ let currentReviewBookId = null;
 let currentReviewBookTitle = "";
 let selectedReviewRating = 0;
 let reviewRatingStars = [];
+let currentEditBook = null;
+
+function openBookEditor(book) {
+  if (!isLibrarian()) return;
+  currentEditBook = book;
+  const modal = $("#bookEditModal");
+  const form = $("#bookEditForm");
+  if (!modal || !form) return;
+
+  $("#bookEditModalTitle").textContent = `Редагування: ${escapeHtml(
+    book.title || "Нова книга"
+  )}`;
+  $("#editBookIsbn").textContent = book.isbn || "—";
+
+  form.elements.title.value = book.title || "";
+  form.elements.author.value = book.author || "";
+  form.elements.description.value = book.description || "";
+  form.elements.year.value = book.published_year ?? "";
+  form.elements.genres.value = (book.genres || []).join(", ");
+  form.elements.copies.value = book.total_copies ?? "";
+  form.elements.cover_image.value = book.cover_image || "";
+
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeBookEditor() {
+  const modal = $("#bookEditModal");
+  const form = $("#bookEditForm");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  if (form) {
+    form.reset();
+  }
+  currentEditBook = null;
+}
+
+async function handleBookEditSubmit(event) {
+  event.preventDefault();
+  if (!currentEditBook) return;
+  const form = event.currentTarget;
+  const title = form.elements.title.value.trim();
+  const author = form.elements.author.value.trim();
+  if (!title || !author) {
+    showToast("Назва та автор обов'язкові", "danger");
+    return;
+  }
+
+  const description = form.elements.description.value.trim();
+  const yearValue = Number(form.elements.year.value);
+  const genres = (form.elements.genres.value || "")
+    .split(",")
+    .map((g) => g.trim())
+    .filter(Boolean);
+  const cover = form.elements.cover_image.value.trim();
+  const copiesValue = Number(form.elements.copies.value);
+
+  const payload = {
+    title,
+    author,
+    description: description || undefined,
+    published_year: Number.isFinite(yearValue) ? yearValue : undefined,
+    genres: genres.length ? genres : undefined,
+    cover_image: cover || undefined,
+    total_copies: Number.isFinite(copiesValue) ? copiesValue : undefined,
+  };
+
+  try {
+    const resp = await fetch(`${apiBase()}/books/${currentEditBook.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(text || "Не вдалося оновити книгу");
+    }
+
+    closeBookEditor();
+    await loadBooks();
+    showToast("Інформацію про книгу оновлено", "success");
+  } catch (err) {
+    showToast(`Не вдалося зберегти: ${err.message || err}`, "danger");
+  }
+}
 
 // ---------- AUTH helpers ----------
 function storeToken(token) {
@@ -91,6 +182,19 @@ function storeToken(token) {
 
 function getToken() {
   return localStorage.getItem("token");
+}
+
+function storeRole(role) {
+  if (role) localStorage.setItem("role", role);
+  else localStorage.removeItem("role");
+}
+
+function getStoredRole() {
+  return localStorage.getItem("role");
+}
+
+function isLibrarian() {
+  return getStoredRole() === "librarian";
 }
 
 function storeEmail(email) {
@@ -110,7 +214,8 @@ function updateAuthUI(email) {
   if (!cur) return;
 
   if (email) {
-    cur.textContent = email;
+    const roleLabel = getStoredRole() === "librarian" ? " (бібліотекар)" : "";
+    cur.textContent = `${email}${roleLabel}`;
     cur.removeAttribute("href");
     cur.classList.add("is-logged");
     if (logoutBtn) logoutBtn.style.display = "inline-block";
@@ -183,6 +288,7 @@ async function registerUser() {
 
     // <-- ТУТ СЕРВЕР ПОВЕРТАЄ loginData.access_token
     storeToken(loginData.access_token);
+    storeRole(loginData.role);
     updateAuthUI(email);
 
     window.location.href = "index.html";
@@ -219,6 +325,7 @@ async function loginUser() {
 
     // <-- ТУТ БЕРЕМО data.access_token
     storeToken(data.access_token);
+    storeRole(data.role);
     updateAuthUI(email);
 
     if (msg) msg.textContent = " Вхід успішний";
@@ -233,6 +340,7 @@ async function loginUser() {
 
 function logout() {
   storeToken(null);
+  storeRole(null);
   updateAuthUI(null);
   showToast("Ви вийшли", "info");
 
@@ -280,12 +388,29 @@ async function loadBooks() {
       const li = document.createElement("li");
       li.dataset.bookId = b.id;
       const available = b.total_copies - b.reserved_count;
+      const descriptionHtml = b.description
+        ? `<p class="muted small book-description">${escapeHtml(
+            b.description
+          )}</p>`
+        : "";
+      const yearHtml = b.published_year
+        ? `<p class="muted small book-year">Рік видання: ${escapeHtml(
+            String(b.published_year)
+          )}</p>`
+        : "";
+      const editBtn = isLibrarian()
+        ? `<button class="btn btn-ghost edit-btn" data-id="${escapeHtml(
+            b.id
+          )}">Редагувати</button>`
+        : "";
       li.innerHTML = `
         <div class="book">
           ${renderCover(b)}
           <div>
             <div class="title">${escapeHtml(b.title)}</div>
-            <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
+            <div class="muted small">Автор: ${escapeHtml(b.author || "-")}</div>
+            ${descriptionHtml}
+            ${yearHtml}
             <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "-")}</div>
             <div class="muted small">  Статус: ${available > 0 ? " Доступна" : " Зарезервована"}</div>
           </div>
@@ -309,6 +434,7 @@ async function loadBooks() {
               data-title="${escapeHtml(b.title)}">
               Відгуки
             </button>
+            ${editBtn}
           </div>
         </div>
       `;
@@ -377,6 +503,7 @@ async function loadBooks() {
       li.querySelector(".review-btn")?.addEventListener("click", () => {
         selectReviewTarget({ id: b.id, title: b.title });
       });
+      li.querySelector(".edit-btn")?.addEventListener("click", () => openBookEditor(b));
 
       list.appendChild(li);
     });
@@ -520,14 +647,25 @@ function renderBook(b) {
   const list = $("#books");
   const li = document.createElement("li");
   const available = b.total_copies - b.reserved_count;
+  const descriptionHtml = b.description
+    ? `<p class="muted small book-description">${escapeHtml(b.description)}</p>`
+    : "";
+  const yearHtml = b.published_year
+    ? `<p class="muted small book-year">Рік видання: ${escapeHtml(String(b.published_year))}</p>`
+    : "";
+  const editBtn = isLibrarian()
+    ? `<button class="btn btn-ghost edit-btn" data-id="${escapeHtml(b.id)}">Редагувати</button>`
+    : "";
 
   li.innerHTML = `
     <div class="book">
       ${renderCover(b)}
       <div>
         <div class="title">${escapeHtml(b.title)}</div>
-        <div class="muted small">Автор: ${escapeHtml(b.author || "—")}</div>
-        <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "—")}</div>
+        <div class="muted small">Автор: ${escapeHtml(b.author || "-")}</div>
+        ${descriptionHtml}
+        ${yearHtml}
+        <div class="muted small">Жанр: ${escapeHtml((b.genres || []).join(", ") || "-")}</div>
         <div class="muted small">Статус: ${available > 0 ? "✅ Доступна" : "⛔ Зарезервована"}</div>
       </div>
 
@@ -540,6 +678,7 @@ function renderBook(b) {
         <button class="btn btn-outline fav-btn" data-id="${escapeHtml(b.id)}">
           У вибране
         </button>
+        ${editBtn}
       </div>
     </div>
   `;
@@ -547,6 +686,7 @@ function renderBook(b) {
   // прив'язуємо ті ж самі події — як у loadBooks()
   li.querySelector(".reserve-btn")?.addEventListener("click", reserveHandler);
   li.querySelector(".fav-btn")?.addEventListener("click", favoriteHandler);
+  li.querySelector(".edit-btn")?.addEventListener("click", () => openBookEditor(b));
 
   list.appendChild(li);
 }
@@ -835,6 +975,21 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   const reviewForm = $("#reviewForm");
   reviewForm?.addEventListener("submit", handleReviewSubmit);
+
+  const editForm = $("#bookEditForm");
+  editForm?.addEventListener("submit", handleBookEditSubmit);
+
+  const editModal = $("#bookEditModal");
+  if (editModal) {
+    editModal
+      .querySelectorAll("[data-modal-close]")
+      .forEach((el) => el.addEventListener("click", closeBookEditor));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !editModal.classList.contains("hidden")) {
+        closeBookEditor();
+      }
+    });
+  }
 
   // Auth buttons – only if elements exist
   addListener("#register-btn", "click", registerUser);

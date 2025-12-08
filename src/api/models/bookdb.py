@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from src.core.database import Base
 from sqlalchemy.orm import relationship
@@ -17,5 +17,7 @@ class Book(Base):
     reserved_count = Column(Integer, default=0)
 
     cover_image = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    published_year = Column(Integer, nullable=True)
 
     reviews = relationship("Review", back_populates="book")
